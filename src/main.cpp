@@ -15,6 +15,7 @@
 #include "modules/utils/configurator/Configurator.h"
 #include "modules/utils/currentcontrol/CurrentControl.h"
 #include "modules/utils/pausebutton/PauseButton.h"
+#include "modules/utils/panel/Panel.h"
 #include "libs/ChaNFSSD/SDFileSystem.h"
 #include "libs/Config.h"
 #include "libs/nuts_bolts.h"
@@ -39,6 +40,7 @@ int main() {
     kernel->add_module( new TemperatureControlPool() );
     kernel->add_module( new SwitchPool() );
     kernel->add_module( new PauseButton() );   
+    kernel->add_module( new Panel() );   
 
     //kernel->add_module( &cdcmsc );
    
