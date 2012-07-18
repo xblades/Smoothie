@@ -22,6 +22,8 @@ class PanelScreen {
         virtual void on_refresh();       
         PanelScreen* set_panel(Panel* parent);
         virtual void on_enter();
+        void refresh_menu();
+        virtual void display_menu_line(uint16_t line);
 
         Panel* panel;
 };

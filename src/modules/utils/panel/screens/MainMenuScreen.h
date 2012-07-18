@@ -23,6 +23,7 @@ class MainMenuScreen : public PanelScreen {
         void on_refresh(); 
         void on_enter();
         void refresh_screen();
+        void display_menu_line(uint16_t line);
 };
 
 

@@ -19,7 +19,7 @@ MainMenuScreen::MainMenuScreen(){}
 
 void MainMenuScreen::on_enter(){
     this->panel->enter_menu_mode();
-    this->panel->setup_menu(7, 4);  // 6 menu items, 4 lines
+    this->panel->setup_menu(6, 4);  // 6 menu items, 4 lines
     this->refresh_screen();
 }
 
@@ -30,14 +30,18 @@ void MainMenuScreen::on_refresh(){
 }
 
 void MainMenuScreen::refresh_screen(){
-    this->panel->lcd->clear(); 
-    for(uint16_t i = this->panel->menu_start_line; i < this->panel->menu_start_line + this->panel->menu_lines; i++ ){
-        this->panel->lcd->setCursor(2, i - this->panel->menu_start_line );
-        this->panel->lcd->printf("i:%d", i);
-    }
-
-    this->panel->lcd->setCursor(0, this->panel->menu_selected_line - this->panel->menu_start_line );
-    this->panel->lcd->printf(">");
-
+    this->refresh_menu();
 }
+
+void MainMenuScreen::display_menu_line(uint16_t line){
+    switch( line ){
+        case 0: this->panel->lcd->printf("Watch"); break;  
+        case 1: this->panel->lcd->printf("File"); break; 
+        case 2: this->panel->lcd->printf("Control"); break; 
+        case 3: this->panel->lcd->printf("Prepare"); break; 
+        case 4: this->panel->lcd->printf("Configure"); break; 
+        case 5: this->panel->lcd->printf("Tune"); break; 
+    }
+}
+
 

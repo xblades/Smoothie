@@ -23,8 +23,18 @@ PanelScreen* PanelScreen::set_panel(Panel* parent){
     return this;
 }
 
-void PanelScreen::on_enter(){
+void PanelScreen::on_enter(){}
+
+void PanelScreen::refresh_menu(){
+    this->panel->lcd->clear(); 
+    for(uint16_t i = this->panel->menu_start_line; i < this->panel->menu_start_line + this->panel->menu_lines; i++ ){
+        this->panel->lcd->setCursor(2, i - this->panel->menu_start_line );
+        this->display_menu_line(i);
+    }
+    this->panel->lcd->setCursor(0, this->panel->menu_selected_line - this->panel->menu_start_line );
+    this->panel->lcd->printf(">");
 }
 
+void PanelScreen::display_menu_line(uint16_t line){};
 
 
