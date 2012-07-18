@@ -8,23 +8,36 @@
 #include "libs/Kernel.h"
 #include "Panel.h"
 #include "PanelScreen.h"
+#include "MainMenuScreen.h"
 #include "libs/nuts_bolts.h"
 #include "libs/utils.h"
 #include "I2CLCD.h"
 #include <string>
 using namespace std;
 
-PanelScreen::PanelScreen(){}
+MainMenuScreen::MainMenuScreen(){}
 
-void PanelScreen::on_refresh(){}
-
-PanelScreen* PanelScreen::set_panel(Panel* parent){
-    this->panel = parent;
-    return this;
+void MainMenuScreen::on_enter(){
+    this->panel->enter_menu_mode();
+    this->panel->setup_menu(7, 4);  // 6 menu items, 4 lines
+    this->refresh_screen();
 }
 
-void PanelScreen::on_enter(){
+void MainMenuScreen::on_refresh(){
+    if( this->panel->menu_change() ){
+        this->refresh_screen();
+    }
 }
 
+void MainMenuScreen::refresh_screen(){
+    this->panel->lcd->clear(); 
+    for(uint16_t i = this->panel->menu_start_line; i < this->panel->menu_start_line + this->panel->menu_lines; i++ ){
+        this->panel->lcd->setCursor(2, i - this->panel->menu_start_line );
+        this->panel->lcd->printf("i:%d", i);
+    }
 
+    this->panel->lcd->setCursor(0, this->panel->menu_selected_line - this->panel->menu_start_line );
+    this->panel->lcd->printf(">");
+
+}
 

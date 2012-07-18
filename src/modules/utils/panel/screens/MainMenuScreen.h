@@ -5,8 +5,8 @@
       You should have received a copy of the GNU General Public License along with Smoothie. If not, see <http://www.gnu.org/licenses/>. 
 */
 
-#ifndef PANELSCREEN_H
-#define PANELSCREEN_H
+#ifndef MAINMENUSCREEN_H
+#define MAINMENUSCREEN_H
 
 #include "libs/Kernel.h"
 #include "libs/nuts_bolts.h"
@@ -14,16 +14,15 @@
 #include "libs/Pin.h"
 #include "I2CLCD.h"
 #include "Panel.h"
+#include "PanelScreen.h"
 
-class Panel;
-class PanelScreen {
+
+class MainMenuScreen : public PanelScreen {
     public:
-        PanelScreen();
-        virtual void on_refresh();       
-        PanelScreen* set_panel(Panel* parent);
-        virtual void on_enter();
-
-        Panel* panel;
+        MainMenuScreen();
+        void on_refresh(); 
+        void on_enter();
+        void refresh_screen();
 };
 
 

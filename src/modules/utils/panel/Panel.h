@@ -14,12 +14,16 @@
 #include "libs/Pin.h"
 #include "I2CLCD.h"
 #include "Button.h"
+#include "PanelScreen.h"
 
 #define panel_checksum             14866 
 #define up_button_pin_checksum     62859       
 #define down_button_pin_checksum   61791
 #define click_button_pin_checksum  9133 
 #define enable_checksum            29545 
+
+#define MENU_MODE                  0
+
 class Panel : public Module {
     public:
         Panel();
@@ -27,19 +31,40 @@ class Panel : public Module {
         void on_module_loaded();
         uint32_t button_tick(uint32_t dummy);
         void on_idle(void* argument);
+        void enter_screen(PanelScreen* screen);
+        void reset_counter();
 
         uint32_t on_up(uint32_t dummy);
         uint32_t on_down(uint32_t dummy);
         uint32_t on_click_release(uint32_t dummy);
+        uint32_t refresh_tick(uint32_t dummy);
+        bool counter_change();
+        bool click();
+
+        void enter_menu_mode();
+        void setup_menu(uint16_t rows, uint16_t lines);
+        void menu_update();
+        bool menu_change();
+        int menu_selected_line;
+        int menu_start_line;
+        int menu_rows;
+        int menu_lines;
+        bool menu_changed;
 
         Button* up_button;
         Button* down_button;
         Button* click_button;
         I2CLCD* lcd;
 
-        int counter;
-        bool counter_change;
-        bool click_change;
+        int* counter;
+        bool counter_changed;
+        bool click_changed;
+        bool refresh_flag;
+
+        char mode;
+
+        PanelScreen* top_screen;
+        PanelScreen* current_screen;
 };
 
 

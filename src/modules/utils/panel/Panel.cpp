@@ -13,11 +13,14 @@
 #include <string>
 using namespace std;
 #include "Button.h"
+#include "PanelScreen.h"
+#include "screens/MainMenuScreen.h"
 
 Panel::Panel(){
-    this->counter = 0;
-    this->counter_change = false;
-    this->click_change = false;
+    this->counter_changed = false;
+    this->click_changed = false;
+    this->refresh_flag = false;
+    this->enter_menu_mode();
 }
 
 void Panel::on_module_loaded(){
@@ -39,8 +42,33 @@ void Panel::on_module_loaded(){
     this->click_button        = (new Button())->pin( this->kernel->config->value( panel_checksum, click_button_pin_checksum )->by_default("nc")->as_pin()->as_input() )->down_attach( this, &Panel::on_click_release );
     this->kernel->slow_ticker->attach( 100, this, &Panel::button_tick );
 
+    // Default screen
+    this->top_screen = (new MainMenuScreen())->set_panel(this);
+    this->enter_screen(this->top_screen);
+
+    // Refresh timer
+    this->kernel->slow_ticker->attach( 20, this, &Panel::refresh_tick );
+
 }
 
+// Enter a screen, we only care about it now
+void Panel::enter_screen(PanelScreen* screen){
+    screen->panel = this;
+    this->current_screen = screen;
+    this->reset_counter();
+    this->current_screen->on_enter();
+}
+
+// Reset the counter
+void Panel::reset_counter(){
+    *this->counter = 0;
+    this->counter_changed = false;
+}
+
+// Indicate the idle loop we want to call the refresh hook in the current screen
+uint32_t Panel::refresh_tick(uint32_t dummy){
+    this->refresh_flag = true;
+}
 
 // Read and update each button
 uint32_t Panel::button_tick(uint32_t dummy){
@@ -49,35 +77,59 @@ uint32_t Panel::button_tick(uint32_t dummy){
     this->click_button->check_signal();
 }
 
-
 // Main loop things, we don't want to do shit in interrupts
 void Panel::on_idle(void* argument){
-    if( this->counter_change ){
-        this->counter_change = false;
-        this->lcd->clear();
-        this->lcd->printf("value: %d", this->counter);
+    // If we are in menu mode and the position has changed
+    if( this->mode == MENU_MODE && this->counter_change() ){
+        this->menu_update();
     }
-    if( this->click_change ){
-        this->click_change = false;
-        this->lcd->clear();
-        this->lcd->printf("click");
+
+    // If we must refresh
+    if( this->refresh_flag ){
+        this->refresh_flag = false;
+        this->current_screen->on_refresh();
     }
 }
 
-uint32_t Panel::on_up(uint32_t dummy){
-    this->counter++;
-    this->counter_change = true;
+// Hooks for button clicks
+uint32_t Panel::on_up(uint32_t dummy){ ++*this->counter; this->counter_changed = true; }
+uint32_t Panel::on_down(uint32_t dummy){ --*this->counter; this->counter_changed = true; }
+uint32_t Panel::on_click_release(uint32_t dummy){ this->click_changed = true; }
+bool Panel::counter_change(){ if( this->counter_changed ){ this->counter_changed = false; return true; }else{ return false; } }
+bool Panel::click(){ if( this->click_changed ){ this->click_changed = false; return true; }else{ return false; } }
+
+
+// Enter menu mode
+void Panel::enter_menu_mode(){
+    this->mode = MENU_MODE;
+    this->counter = &this->menu_selected_line;
+    this->menu_changed = false;
 }
 
-uint32_t Panel::on_down(uint32_t dummy){
-    this->counter--;
-    this->counter_change = true;
+void Panel::setup_menu(uint16_t rows, uint16_t lines){
+    this->menu_selected_line = 0;
+    this->menu_start_line = 0; 
+    this->menu_rows = rows;
+    this->menu_lines = lines;
 }
 
-uint32_t Panel::on_click_release(uint32_t dummy){
-    this->click_change = true;
+void Panel::menu_update(){
+    // Limits, up and down 
+    this->menu_selected_line = this->menu_selected_line % this->menu_rows;
+    while( this->menu_selected_line < 0 ){ this->menu_selected_line += this->menu_rows; }
+
+    // What to display
+    this->menu_start_line = 0;
+    if( this->menu_selected_line >= 2 ){
+        this->menu_start_line = this->menu_selected_line - 1;
+    }
+    if( this->menu_selected_line > this->menu_rows - this->menu_lines ){
+        this->menu_start_line = this->menu_rows - this->menu_lines;
+    }
+    this->menu_changed = true;
 }
 
-
-
+bool Panel::menu_change(){
+    if( this->menu_changed ){ this->menu_changed = false; return true; }else{ return false; }
+}
 
