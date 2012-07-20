@@ -5,33 +5,26 @@
       You should have received a copy of the GNU General Public License along with Smoothie. If not, see <http://www.gnu.org/licenses/>. 
 */
 
-#ifndef MAINMENUSCREEN_H
-#define MAINMENUSCREEN_H
-
 #include "libs/Kernel.h"
-#include "libs/nuts_bolts.h"
-#include "libs/utils.h"
-#include "libs/Pin.h"
-#include "I2CLCD.h"
 #include "Panel.h"
 #include "PanelScreen.h"
+#include "MainMenuScreen.h"
 #include "WatchScreen.h"
+#include "libs/nuts_bolts.h"
+#include "libs/utils.h"
+#include "I2CLCD.h"
+#include <string>
+using namespace std;
 
-class MainMenuScreen : public PanelScreen {
-    public:
-        MainMenuScreen();
-        void on_refresh(); 
-        void on_enter();
-        void refresh_screen();
-        void display_menu_line(uint16_t line);
-        void clicked_menu_entry(uint16_t line);
+WatchScreen::WatchScreen(){}
 
-        PanelScreen* watch_screen;
-};
+void WatchScreen::on_enter(){
+    this->panel->lcd->clear();
+    this->panel->lcd->printf("entered watch");
+}
+
+void WatchScreen::on_refresh(){
+}
 
 
 
-
-
-
-#endif

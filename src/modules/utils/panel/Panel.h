@@ -21,6 +21,8 @@
 #define down_button_pin_checksum   61791
 #define click_button_pin_checksum  9133 
 #define enable_checksum            29545 
+#define encoder_a_pin_checksum     63819 
+#define encoder_b_pin_checksum     65100 
 
 #define MENU_MODE                  0
 
@@ -38,6 +40,8 @@ class Panel : public Module {
         uint32_t on_down(uint32_t dummy);
         uint32_t on_click_release(uint32_t dummy);
         uint32_t refresh_tick(uint32_t dummy);
+        uint32_t encoder_tick(uint32_t dummy);
+        uint32_t encoder_change(uint32_t dummy);
         bool counter_change();
         bool click();
 
@@ -53,6 +57,8 @@ class Panel : public Module {
 
         Button* up_button;
         Button* down_button;
+        Button* encoder_a_pin;
+        Button* encoder_b_pin;
         Button* click_button;
         I2CLCD* lcd;
 

@@ -21,11 +21,13 @@ class PanelScreen {
         PanelScreen();
         virtual void on_refresh();       
         PanelScreen* set_panel(Panel* parent);
+        PanelScreen* set_parent(PanelScreen* passed_parent);
         virtual void on_enter();
         void refresh_menu();
         virtual void display_menu_line(uint16_t line);
 
         Panel* panel;
+        PanelScreen* parent;
 };
 
 
