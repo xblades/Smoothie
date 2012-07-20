@@ -40,8 +40,7 @@ class Panel : public Module {
         uint32_t on_down(uint32_t dummy);
         uint32_t on_click_release(uint32_t dummy);
         uint32_t refresh_tick(uint32_t dummy);
-        uint32_t encoder_tick(uint32_t dummy);
-        uint32_t encoder_change(uint32_t dummy);
+        uint32_t encoder_check(uint32_t dummy);
         bool counter_change();
         bool click();
 
@@ -57,8 +56,8 @@ class Panel : public Module {
 
         Button* up_button;
         Button* down_button;
-        Button* encoder_a_pin;
-        Button* encoder_b_pin;
+        Pin* encoder_a_pin;
+        Pin* encoder_b_pin;
         Button* click_button;
         I2CLCD* lcd;
 

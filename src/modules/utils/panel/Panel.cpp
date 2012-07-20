@@ -39,11 +39,11 @@ void Panel::on_module_loaded(){
     // Control buttons
     this->up_button           = (new Button())->pin( this->kernel->config->value( panel_checksum, up_button_pin_checksum    )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::on_up );
     this->down_button         = (new Button())->pin( this->kernel->config->value( panel_checksum, down_button_pin_checksum  )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::on_down );
-    this->encoder_a_pin       = (new Button())->pin( this->kernel->config->value( panel_checksum, encoder_a_pin_checksum    )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::encoder_change );
-    this->encoder_b_pin       = (new Button())->pin( this->kernel->config->value( panel_checksum, encoder_b_pin_checksum    )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::encoder_change );
+    this->encoder_a_pin       = this->kernel->config->value( panel_checksum, encoder_a_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
+    this->encoder_b_pin       = this->kernel->config->value( panel_checksum, encoder_b_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
     this->click_button        = (new Button())->pin( this->kernel->config->value( panel_checksum, click_button_pin_checksum )->by_default("nc")->as_pin()->as_input() )->down_attach( this, &Panel::on_click_release );
     this->kernel->slow_ticker->attach( 100,  this, &Panel::button_tick );
-    this->kernel->slow_ticker->attach( 5000, this, &Panel::encoder_tick );
+    this->kernel->slow_ticker->attach( 100, this, &Panel::encoder_check );
 
     // Default screen
     this->top_screen = (new MainMenuScreen())->set_panel(this);
@@ -73,22 +73,21 @@ uint32_t Panel::refresh_tick(uint32_t dummy){
     this->refresh_flag = true;
 }
 
-// Read/update the encoder pins
-uint32_t Panel::encoder_tick(uint32_t dummy){
-    this->encoder_a_pin->check_signal();
-    this->encoder_b_pin->check_signal();
-}
-
 // Encoder pins changed
-uint32_t Panel::encoder_change(uint32_t dummy){
+uint32_t Panel::encoder_check(uint32_t dummy){
     static int8_t enc_states[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
     static uint8_t old_AB = 0;
+    static int encoder_counter = 0;
     old_AB <<= 2;                   //remember previous state
     old_AB |= ( this->encoder_a_pin->get() + ( this->encoder_b_pin->get() * 2 ) );  //add current state 
     int change =  enc_states[(old_AB&0x0f)];
-    (*this->counter) += change;
+    encoder_counter += change; 
     if( change != 0 ){ this->counter_changed = true; }
+    if( encoder_counter % 2 == 0 ){
+        (*this->counter) += change;
+    }
 }
+
 
 // Read and update each button
 uint32_t Panel::button_tick(uint32_t dummy){
