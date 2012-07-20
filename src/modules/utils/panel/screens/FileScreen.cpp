@@ -20,6 +20,7 @@ FileScreen::FileScreen(){
     this->current_folder = "";
 }
 
+// When entering this screen
 void FileScreen::on_enter(){
     this->panel->lcd->clear();
 
@@ -31,7 +32,7 @@ void FileScreen::on_enter(){
     }
 }
 
-
+// For every ( potential ) refresh of the screen
 void FileScreen::on_refresh(){
     if( this->panel->menu_change() ){
         this->panel->lcd->clear();
@@ -42,6 +43,7 @@ void FileScreen::on_refresh(){
     }
 }
 
+// Enter a new folder
 void FileScreen::enter_folder(std::string folder){
     // Rembember where we are
     this->current_folder = folder;
@@ -59,6 +61,7 @@ void FileScreen::enter_folder(std::string folder){
 
 }
 
+// Called by the panel when refreshing the menu, display .. then all files in the current dir
 void FileScreen::display_menu_line(uint16_t line){
     if( line == 0 ){
         this->panel->lcd->printf("..");
@@ -67,6 +70,7 @@ void FileScreen::display_menu_line(uint16_t line){
     }
 }
 
+// When a line is clicked in the menu, act
 void FileScreen::clicked_line(uint16_t line){
     if( line == 0 ){
         if( this->current_folder.compare("/") == 0 ){
@@ -90,6 +94,7 @@ void FileScreen::clicked_line(uint16_t line){
 
 }
 
+// Check wether a line is a folder or a file
 bool FileScreen::is_a_folder( string path ){
     // In the special case of /local/ ( the mbed flash chip ) we don't have sub-folders, everything is a file 
     if( path.substr(0,7).compare("/local/") == 0 ){
@@ -107,6 +112,7 @@ bool FileScreen::is_a_folder( string path ){
     }
 }
 
+// Find the "line"th file in the current folder
 string FileScreen::file_at(uint16_t line){
     DIR* d;
     struct dirent* p;
@@ -130,6 +136,7 @@ string FileScreen::file_at(uint16_t line){
     closedir(d);
 }
 
+// Count how many files there are in the current folder
 uint16_t FileScreen::count_folder_content(std::string folder){
     DIR* d;
     struct dirent* p;
@@ -146,3 +153,6 @@ uint16_t FileScreen::count_folder_content(std::string folder){
         return 0; 
     }
 }
+
+
+

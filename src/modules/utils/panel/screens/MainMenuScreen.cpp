@@ -11,6 +11,7 @@
 #include "MainMenuScreen.h"
 #include "WatchScreen.h"
 #include "FileScreen.h"
+#include "ControlScreen.h"
 #include "libs/nuts_bolts.h"
 #include "libs/utils.h"
 #include "I2CLCD.h"
@@ -22,11 +23,13 @@ MainMenuScreen::MainMenuScreen(){}
 void MainMenuScreen::on_enter(){
     this->panel->enter_menu_mode();
     this->panel->setup_menu(6, 4);  // 6 menu items, 4 lines
-    this->refresh_screen();
 
+    this->refresh_screen();
+    
     // Children screens
-    this->watch_screen = (new WatchScreen())->set_parent(this);
-    this->file_screen  = (new FileScreen() )->set_parent(this);
+    this->watch_screen   = (new WatchScreen()   )->set_parent(this);
+    this->file_screen    = (new FileScreen()    )->set_parent(this);
+    this->control_screen = (new ControlScreen() )->set_parent(this); 
 
 }
 
@@ -54,13 +57,18 @@ void MainMenuScreen::display_menu_line(uint16_t line){
         case 4: this->panel->lcd->printf("Configure"); break; 
         case 5: this->panel->lcd->printf("Tune"); break; 
     }
+
+
 }
 
 void MainMenuScreen::clicked_menu_entry(uint16_t line){
     switch( line ){
-        case 0: this->panel->enter_screen(this->watch_screen); break;
-        case 1: this->panel->enter_screen(this->file_screen ); break;
+        case 0: this->panel->enter_screen(this->watch_screen   ); break;
+        case 1: this->panel->enter_screen(this->file_screen    ); break;
+        case 2: this->panel->enter_screen(this->control_screen ); break;
     }
+
+
 }
 
 
