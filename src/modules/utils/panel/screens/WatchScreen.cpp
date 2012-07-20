@@ -19,12 +19,32 @@ using namespace std;
 WatchScreen::WatchScreen(){}
 
 void WatchScreen::on_enter(){
-    this->panel->lcd->clear();
-    this->panel->lcd->printf("entered watch");
+    this->display_screen();
 }
 
 void WatchScreen::on_refresh(){
+    // Exit if the button is clicked 
+    if( this->panel->click() ){
+        this->panel->enter_screen(this->parent);
+        return;
+    }
+
+    // Only every 20 refreshes
+    static int update_counts = 0;
+    update_counts++;
+    if( update_counts % 20 == 0 ){
+    }
 }
 
-
+void WatchScreen::display_screen(){
+        this->panel->lcd->clear();
+        this->panel->lcd->setCursor(0,0);
+        this->panel->lcd->printf("H137/000c B048/000c");
+        this->panel->lcd->setCursor(0,1);
+        this->panel->lcd->printf("          Z:+000.00");
+        this->panel->lcd->setCursor(0,2);
+        this->panel->lcd->printf("100%%      00%% sd");
+        this->panel->lcd->setCursor(0,3);
+        this->panel->lcd->printf("Smoothie ready");
+}
 

@@ -39,11 +39,11 @@ void Panel::on_module_loaded(){
     // Control buttons
     this->up_button           = (new Button())->pin( this->kernel->config->value( panel_checksum, up_button_pin_checksum    )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::on_up );
     this->down_button         = (new Button())->pin( this->kernel->config->value( panel_checksum, down_button_pin_checksum  )->by_default("nc")->as_pin()->as_input() )->up_attach(   this, &Panel::on_down );
-    this->encoder_a_pin       = this->kernel->config->value( panel_checksum, encoder_a_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
-    this->encoder_b_pin       = this->kernel->config->value( panel_checksum, encoder_b_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
+    this->encoder_a_pin       =                      this->kernel->config->value( panel_checksum, encoder_a_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
+    this->encoder_b_pin       =                      this->kernel->config->value( panel_checksum, encoder_b_pin_checksum    )->by_default("nc")->as_pin()->as_input() ;
     this->click_button        = (new Button())->pin( this->kernel->config->value( panel_checksum, click_button_pin_checksum )->by_default("nc")->as_pin()->as_input() )->down_attach( this, &Panel::on_click_release );
     this->kernel->slow_ticker->attach( 100,  this, &Panel::button_tick );
-    this->kernel->slow_ticker->attach( 100, this, &Panel::encoder_check );
+    this->kernel->slow_ticker->attach( 1000, this, &Panel::encoder_check );
 
     // Default screen
     this->top_screen = (new MainMenuScreen())->set_panel(this);
@@ -87,7 +87,6 @@ uint32_t Panel::encoder_check(uint32_t dummy){
         (*this->counter) += change;
     }
 }
-
 
 // Read and update each button
 uint32_t Panel::button_tick(uint32_t dummy){
@@ -139,11 +138,13 @@ void Panel::menu_update(){
 
     // What to display
     this->menu_start_line = 0;
-    if( this->menu_selected_line >= 2 ){
-        this->menu_start_line = this->menu_selected_line - 1;
-    }
-    if( this->menu_selected_line > this->menu_rows - this->menu_lines ){
-        this->menu_start_line = this->menu_rows - this->menu_lines;
+    if( this->menu_rows > this->menu_lines ){
+        if( this->menu_selected_line >= 2 ){
+            this->menu_start_line = this->menu_selected_line - 1;
+        }
+        if( this->menu_selected_line > this->menu_rows - this->menu_lines ){
+            this->menu_start_line = this->menu_rows - this->menu_lines;
+        }
     }
     this->menu_changed = true;
 }

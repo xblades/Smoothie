@@ -27,6 +27,7 @@ class MainMenuScreen : public PanelScreen {
         void clicked_menu_entry(uint16_t line);
 
         PanelScreen* watch_screen;
+        PanelScreen* file_screen;
 };
 
 

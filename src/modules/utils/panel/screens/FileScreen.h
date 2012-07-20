@@ -5,8 +5,8 @@
       You should have received a copy of the GNU General Public License along with Smoothie. If not, see <http://www.gnu.org/licenses/>. 
 */
 
-#ifndef WATCHSCREEN_H
-#define WATCHSCREEN_H
+#ifndef FILESCREEN_H
+#define FILESCREEN_H
 
 #include "libs/Kernel.h"
 #include "libs/nuts_bolts.h"
@@ -16,12 +16,23 @@
 #include "Panel.h"
 #include "PanelScreen.h"
 
-class WatchScreen : public PanelScreen {
+#include <string>
+using namespace std;
+
+class FileScreen : public PanelScreen {
     public:
-        WatchScreen();
-        void on_refresh(); 
+        FileScreen();
         void on_enter();
-        void display_screen();
+        void on_refresh(); 
+        void enter_folder(std::string folder);
+        uint16_t count_folder_content(std::string folder);
+        void clicked_line(uint16_t line);
+        void display_menu_line(uint16_t line);
+        bool is_a_folder( string path );
+        string file_at(uint16_t line);
+
+        std::string current_folder;
+
 };
 
 

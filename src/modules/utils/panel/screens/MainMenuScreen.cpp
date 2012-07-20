@@ -10,6 +10,7 @@
 #include "PanelScreen.h"
 #include "MainMenuScreen.h"
 #include "WatchScreen.h"
+#include "FileScreen.h"
 #include "libs/nuts_bolts.h"
 #include "libs/utils.h"
 #include "I2CLCD.h"
@@ -25,6 +26,7 @@ void MainMenuScreen::on_enter(){
 
     // Children screens
     this->watch_screen = (new WatchScreen())->set_parent(this);
+    this->file_screen  = (new FileScreen() )->set_parent(this);
 
 }
 
@@ -35,6 +37,8 @@ void MainMenuScreen::on_refresh(){
     if( this->panel->click() ){
         this->clicked_menu_entry(this->panel->menu_selected_line);
     }
+
+
 }
 
 void MainMenuScreen::refresh_screen(){
@@ -55,6 +59,7 @@ void MainMenuScreen::display_menu_line(uint16_t line){
 void MainMenuScreen::clicked_menu_entry(uint16_t line){
     switch( line ){
         case 0: this->panel->enter_screen(this->watch_screen); break;
+        case 1: this->panel->enter_screen(this->file_screen ); break;
     }
 }
 

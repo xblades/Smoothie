@@ -60,6 +60,7 @@ void SimpleShell::ls_command( string parameters, StreamOutput* stream ){
     } else {
         stream->printf("Could not open directory %s \r\n", folder.c_str());
     }
+    closedir(d);
 }
 
 // Change current absolute path to provided path
@@ -74,6 +75,7 @@ void SimpleShell::cd_command( string parameters, StreamOutput* stream ){
     }else{
         this->current_path = folder;
     }
+    closedir(d);
 }
 
 // Responds with the present working directory
