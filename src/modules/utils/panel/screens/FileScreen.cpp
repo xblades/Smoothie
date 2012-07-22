@@ -82,6 +82,7 @@ void FileScreen::clicked_line(uint16_t line){
             this->enter_folder(this->current_folder);
         }
     }else{
+        printf("enter file\r\n");
         // Enter file
         string path = this->current_folder;
         if( path.compare("/") == 0 ){ path = ""; } 
