@@ -29,7 +29,7 @@ void ControlScreen::on_refresh(){
         this->refresh_menu();
     }
     if( this->panel->click() ){
-        this->clicked_menu_entry(this->panel->menu_selected_line);
+        this->clicked_menu_entry(this->panel->menu_current_line());
     }
 }
 

@@ -47,7 +47,9 @@ class Panel : public Module {
         void enter_menu_mode();
         void setup_menu(uint16_t rows, uint16_t lines);
         void menu_update();
+        uint16_t menu_current_line();
         bool menu_change();
+        char menu_offset;
         int menu_selected_line;
         int menu_start_line;
         int menu_rows;

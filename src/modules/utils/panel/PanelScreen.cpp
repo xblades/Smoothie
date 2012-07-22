@@ -31,7 +31,7 @@ void PanelScreen::refresh_menu(){
         this->panel->lcd->setCursor(2, i - this->panel->menu_start_line );
         this->display_menu_line(i);
     }
-    this->panel->lcd->setCursor(0, this->panel->menu_selected_line - this->panel->menu_start_line );
+    this->panel->lcd->setCursor(0, this->panel->menu_current_line() - this->panel->menu_start_line );
     this->panel->lcd->printf(">");
 }
 

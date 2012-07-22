@@ -21,6 +21,7 @@ Panel::Panel(){
     this->click_changed = false;
     this->refresh_flag = false;
     this->enter_menu_mode();
+    this->menu_offset = 1;
 }
 
 void Panel::on_module_loaded(){
@@ -131,21 +132,27 @@ void Panel::setup_menu(uint16_t rows, uint16_t lines){
     this->menu_lines = lines;
 }
 
+uint16_t Panel::menu_current_line(){
+    return this->menu_selected_line >> this->menu_offset;
+}
+
 void Panel::menu_update(){
+
     // Limits, up and down 
-    this->menu_selected_line = this->menu_selected_line % this->menu_rows;
-    while( this->menu_selected_line < 0 ){ this->menu_selected_line += this->menu_rows; }
+    this->menu_selected_line = this->menu_selected_line % ( this->menu_rows<<this->menu_offset );
+    while( this->menu_selected_line < 0 ){ this->menu_selected_line += this->menu_rows << this->menu_offset; }
 
     // What to display
     this->menu_start_line = 0;
     if( this->menu_rows > this->menu_lines ){
-        if( this->menu_selected_line >= 2 ){
-            this->menu_start_line = this->menu_selected_line - 1;
+        if( this->menu_current_line() >= 2 ){
+            this->menu_start_line = this->menu_current_line() - 1;
         }
-        if( this->menu_selected_line > this->menu_rows - this->menu_lines ){
+        if( this->menu_current_line() > this->menu_rows - this->menu_lines ){
             this->menu_start_line = this->menu_rows - this->menu_lines;
         }
     }
+
     this->menu_changed = true;
 }
 
