@@ -25,6 +25,8 @@
 #define encoder_b_pin_checksum     65100 
 
 #define MENU_MODE                  0
+#define CONTROL_MODE               1
+
 
 class Panel : public Module {
     public:
@@ -36,6 +38,7 @@ class Panel : public Module {
         void enter_screen(PanelScreen* screen);
         void reset_counter();
 
+        // Encoder and buttons
         uint32_t on_up(uint32_t dummy);
         uint32_t on_down(uint32_t dummy);
         uint32_t on_click_release(uint32_t dummy);
@@ -44,6 +47,7 @@ class Panel : public Module {
         bool counter_change();
         bool click();
 
+        // Menu
         void enter_menu_mode();
         void setup_menu(uint16_t rows, uint16_t lines);
         void menu_update();
@@ -55,6 +59,14 @@ class Panel : public Module {
         int menu_rows;
         int menu_lines;
         bool menu_changed;
+
+        // Control
+        bool enter_control_mode(double passed_normal_increment, double passed_pressed_increment);
+        bool set_control_value(double value);
+        double normal_increment;
+        double pressed_increment;
+        int control_normal_counter;
+        int control_pressed_counter;
 
         Button* up_button;
         Button* down_button;

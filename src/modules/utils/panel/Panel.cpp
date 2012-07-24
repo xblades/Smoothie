@@ -103,6 +103,12 @@ void Panel::on_idle(void* argument){
         this->menu_update();
     }
 
+    // If we are in control mode
+    if( this->mode == CONTROL_MODE && this->counter_change() ){
+
+
+    }
+
     // If we must refresh
     if( this->refresh_flag ){
         this->refresh_flag = false;
@@ -159,4 +165,22 @@ void Panel::menu_update(){
 bool Panel::menu_change(){
     if( this->menu_changed ){ this->menu_changed = false; return true; }else{ return false; }
 }
+
+
+bool Panel::enter_control_mode(double passed_normal_increment, double passed_pressed_increment){
+    this->mode = CONTROL_MODE;
+    this->normal_increment  = passed_normal_increment;
+    this->pressed_increment = passed_pressed_increment;
+    this->counter = &this->control_normal_counter;
+    this->control_normal_counter = 0;
+    this->control_pressed_counter = 0;
+    this->control_base_value = 0;
+}
+
+
+bool Pane::set_control_value(double value){
+    this->control_base_value = value;
+}
+
+
 

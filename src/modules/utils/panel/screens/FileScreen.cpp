@@ -45,6 +45,7 @@ void FileScreen::on_refresh(){
 
 // Enter a new folder
 void FileScreen::enter_folder(std::string folder){
+
     // Rembember where we are
     this->current_folder = folder;
    
@@ -79,6 +80,7 @@ void FileScreen::clicked_line(uint16_t line){
         }else{
             // Go up one folder
             this->current_folder = this->current_folder.substr(0,this->current_folder.find_last_of('/')+1);
+            if( this->current_folder[this->current_folder.length()-1] == '/' && this->current_folder.length() != 1 ){ this->current_folder.erase(this->current_folder.length()-1,1); }
             this->enter_folder(this->current_folder);
         }
     }else{

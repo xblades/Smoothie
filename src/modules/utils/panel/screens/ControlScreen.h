@@ -17,6 +17,9 @@
 #include "PanelScreen.h"
 #include "MainMenuScreen.h"
 
+#define NULL_CONTROL_MODE 0
+#define AXIS_CONTROL_MODE 1
+
 class ControlScreen : public PanelScreen {
     public:
         ControlScreen();
@@ -24,7 +27,10 @@ class ControlScreen : public PanelScreen {
         void on_enter();
         void display_menu_line(uint16_t line);
         void clicked_menu_entry(uint16_t line);
+        void display_axis_line(char axis);
 
+        char control_mode;
+        char controlled_axis;
 
 };
 
