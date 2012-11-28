@@ -13,7 +13,6 @@
 #include "../communication/utils/Gcode.h"
 #include "Block.h"
 
-#define acceleration_checksum       25326
 #define max_jerk_checksum           61012
 #define junction_deviation_checksum 6035
 
@@ -25,7 +24,7 @@ using namespace std;
 class Planner : public Module {
     public:
         Planner();
-        void append_block( int target[], double feed_rate, double distance, double deltas[] );
+        void append_block( int target[], double feed_rate, double acceleration, double distance, double deltas[] );
         double max_allowable_speed( double acceleration, double target_velocity, double distance);
         void recalculate();
         void reverse_pass();
@@ -43,7 +42,6 @@ class Planner : public Module {
         bool has_deleted_block;       // Flag for above value
         float previous_nominal_speed;
 
-        double acceleration;          // Setting
         double max_jerk;              // Setting
         double junction_deviation;    // Setting
 

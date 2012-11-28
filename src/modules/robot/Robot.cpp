@@ -62,6 +62,10 @@ void Robot::on_config_reload(void* argument){
     this->alpha_en_pin        =  this->kernel->config->value(alpha_en_pin_checksum                 )->by_default("0.4"      )->as_pin()->as_output()->as_open_drain();
     this->beta_en_pin         =  this->kernel->config->value(beta_en_pin_checksum                  )->by_default("0.10"     )->as_pin()->as_output()->as_open_drain();
     this->gamma_en_pin        =  this->kernel->config->value(gamma_en_pin_checksum                 )->by_default("0.19"     )->as_pin()->as_output()->as_open_drain();
+    this->acceleration        = this->kernel->config->value(acceleration_checksum       )->by_default(100 )->as_number();
+    this->axis_acceleration[X_AXIS] = this->kernel->config->value(x_acceleration_checksum       )->by_default(-1 )->as_number();
+    this->axis_acceleration[Y_AXIS] = this->kernel->config->value(y_acceleration_checksum       )->by_default(-1 )->as_number();
+    this->axis_acceleration[Z_AXIS] = this->kernel->config->value(z_acceleration_checksum       )->by_default(-1 )->as_number();
 
 }
 
@@ -108,6 +112,11 @@ void Robot::execute_gcode(Gcode* gcode){
            case 21:this->inch_mode = false; break;
            case 90:this->absolute_mode = true; break;
            case 91:this->absolute_mode = false; break;
+           case 28:
+               clear_vector(this->current_position);
+               clear_vector(this->last_milestone);
+               clear_vector(this->kernel->planner->position);
+               break;
            /*case 92: clear_vector(this->last_milestone);
                     for (char letter = 'X'; letter <= 'Z'; letter++){
                         if ( gcode->has_letter(letter) )
@@ -165,6 +174,7 @@ void Robot::append_milestone( double target[], double rate ){
     this->arm_solution->millimeters_to_steps( target, steps );
     
     double deltas[3];
+    double acceleration_value = this->acceleration;
     for(int axis=X_AXIS;axis<=Z_AXIS;axis++){deltas[axis]=target[axis]-this->last_milestone[axis];}
 
     
@@ -176,16 +186,21 @@ void Robot::append_milestone( double target[], double rate ){
     for(int axis=X_AXIS;axis<=Z_AXIS;axis++){
         if( this->max_speeds[axis] > 0 ){
             double axis_speed = ( fabs(deltas[axis]) / ( millimeters_of_travel / rate )) * 60;
-            if( axis_speed > this->max_speeds[axis] ){
+            if (( axis_speed > this->max_speeds[axis] ) && (fabs(deltas[axis])>0)) { 
                 rate = rate * ( this->max_speeds[axis] / axis_speed );
+            }
+        }
+        if ((acceleration_value > axis_acceleration[axis]) && (fabs(deltas[axis])>0) && (axis_acceleration[axis]>0) ) {
+        	double new_acceleration = axis_acceleration[axis] * millimeters_of_travel / fabs(deltas[axis]);	
+            if (new_acceleration < acceleration_value) {
+                acceleration_value = new_acceleration;
             }
         }
     }
 
-    this->kernel->planner->append_block( steps, rate*60, millimeters_of_travel, deltas );
+    this->kernel->planner->append_block( steps, rate*60, acceleration_value, millimeters_of_travel, deltas ); 
 
     memcpy(this->last_milestone, target, sizeof(double)*3); // this->last_milestone[] = target[];
-
 }
 
 void Robot::append_line(Gcode* gcode, double target[], double rate ){

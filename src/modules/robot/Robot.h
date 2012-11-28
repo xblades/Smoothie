@@ -27,6 +27,10 @@ using std::string;
 #define x_axis_max_speed_checksum              64935
 #define y_axis_max_speed_checksum              3752
 #define z_axis_max_speed_checksum              7849
+#define acceleration_checksum                  25326
+#define x_acceleration_checksum                53446
+#define y_acceleration_checksum                57031
+#define z_acceleration_checksum                60616
 
 #define NEXT_ACTION_DEFAULT 0
 #define NEXT_ACTION_DWELL 1
@@ -90,6 +94,8 @@ class Robot : public Module {
         // computational efficiency of generating arcs.
         int arc_correction;                                   // Setting : how often to rectify arc computation
         double max_speeds[3];                                 // Setting : max allowable speed in mm/m for each axis
+        double acceleration;                                  // Setting :Â Used to calculate accelleration for the block
+        double axis_acceleration[3];                          // Setting :Â Used to calculate slower accelleration for one axis
 
     // Used by Stepper
     public:

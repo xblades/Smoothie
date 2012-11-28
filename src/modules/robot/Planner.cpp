@@ -29,14 +29,13 @@ void Planner::on_module_loaded(){
 }
 
 void Planner::on_config_reload(void* argument){
-    this->acceleration =       this->kernel->config->value(acceleration_checksum       )->by_default(100 )->as_number() * 60 * 60; // Acceleration is in mm/minute^2, see https://github.com/grbl/grbl/commit/9141ad282540eaa50a41283685f901f29c24ddbd#planner.c
     this->max_jerk =           this->kernel->config->value(max_jerk_checksum           )->by_default(100 )->as_number();
     this->junction_deviation = this->kernel->config->value(junction_deviation_checksum )->by_default(0.05)->as_number();
 }
 
 
 // Append a block to the queue, compute it's speed factors
-void Planner::append_block( int target[], double feed_rate, double distance, double deltas[] ){
+void Planner::append_block( int target[], double feed_rate, double acceleration, double distance, double deltas[] ){
 
     //printf("new block\r\n");
 
@@ -48,6 +47,7 @@ void Planner::append_block( int target[], double feed_rate, double distance, dou
 
     // Direction bits
     block->direction_bits = 0;
+    block->acceleration = acceleration;
     for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){
         if( target[stepper] < position[stepper] ){ block->direction_bits |= (1<<stepper); }
     }
@@ -83,7 +83,7 @@ void Planner::append_block( int target[], double feed_rate, double distance, dou
     // To generate trapezoids with contant acceleration between blocks the rate_delta must be computed
     // specifically for each line to compensate for this phenomenon:
     // Convert universal acceleration for direction-dependent stepper rate change parameter
-    block->rate_delta = (float)( ( block->steps_event_count*inverse_millimeters * this->acceleration ) / ( this->kernel->stepper->acceleration_ticks_per_second * 60 ) ); // (step/min/acceleration_tick)
+    block->rate_delta = (float)( ( block->steps_event_count*inverse_millimeters * acceleration ) / ( this->kernel->stepper->acceleration_ticks_per_second * 60 ) ); // (step/min/acceleration_tick)
 
 
     // Compute path unit vector
@@ -118,14 +118,14 @@ void Planner::append_block( int target[], double feed_rate, double distance, dou
           // Compute maximum junction velocity based on maximum acceleration and junction deviation
           double sin_theta_d2 = sqrt(0.5*(1.0-cos_theta)); // Trig half angle identity. Always positive.
           vmax_junction = min(vmax_junction,
-            sqrt(this->acceleration * this->junction_deviation * sin_theta_d2/(1.0-sin_theta_d2)) );
+            sqrt(acceleration * this->junction_deviation * sin_theta_d2/(1.0-sin_theta_d2)) ); 
         }
       }
     }
     block->max_entry_speed = vmax_junction;
    
     // Initialize block entry speed. Compute based on deceleration to user-defined MINIMUM_PLANNER_SPEED.
-    double v_allowable = this->max_allowable_speed(-this->acceleration,0.0,block->millimeters); //TODO: Get from config
+    double v_allowable = this->max_allowable_speed(-acceleration,0.0,block->millimeters); //TODO: Get from config
     block->entry_speed = min(vmax_junction, v_allowable);
 
     // Initialize planner efficiency flags
