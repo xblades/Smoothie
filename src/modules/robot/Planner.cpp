@@ -184,10 +184,11 @@ void Planner::recalculate() {
 // implements the reverse pass.
 void Planner::reverse_pass(){
     // For each block
+    int block_index_end = this->kernel->player->queue.head;
     int block_index = this->kernel->player->queue.tail;
     Block* blocks[3] = {NULL,NULL,NULL};
 
-    while(block_index!=this->kernel->player->queue.head){
+    while(block_index!=block_index_end){
         block_index = this->kernel->player->queue.prev_block_index( block_index );
         blocks[2] = blocks[1];
         blocks[1] = blocks[0];
@@ -226,22 +227,11 @@ void Planner::recalculate_trapezoids() {
     int block_index = this->kernel->player->queue.head;
     Block* current;
     Block* next = NULL;
-
+    // Last/newest block in buffer. Exit speed is set with MINIMUM_PLANNER_SPEED. Always recalculated.
     while(block_index != this->kernel->player->queue.tail){
-        current = next;
         next = &this->kernel->player->queue.buffer[block_index];
-        //this->kernel->streams->printf("index:%d current:%p next:%p \r\n", block_index, current, next );
-        if( current ){
-            // Recalculate if current block entry or exit junction speed has changed.
-            if( current->recalculate_flag || next->recalculate_flag ){
-                current->calculate_trapezoid( current->entry_speed/current->nominal_speed, next->entry_speed/current->nominal_speed );
-                current->recalculate_flag = false;
-            }
-        }
         block_index = this->kernel->player->queue.next_block_index( block_index );
     }
-
-    // Last/newest block in buffer. Exit speed is set with MINIMUM_PLANNER_SPEED. Always recalculated.
     next->calculate_trapezoid( next->entry_speed/next->nominal_speed, MINIMUM_PLANNER_SPEED/next->nominal_speed); //TODO: Make configuration option
     next->recalculate_flag = false;
 

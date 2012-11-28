@@ -51,6 +51,7 @@ void Stepper::on_module_loaded(){
     this->kernel->robot->beta_stepper_motor->attach( this, &Stepper::stepper_motor_finished_move );
     this->kernel->robot->gamma_stepper_motor->attach(this, &Stepper::stepper_motor_finished_move );
 
+    this->trapezoid_adjusted_rate = 0.0;
 }
 
 // Get configuration from the config file
@@ -58,6 +59,8 @@ void Stepper::on_config_reload(void* argument){
 
     this->acceleration_ticks_per_second =  this->kernel->config->value(acceleration_ticks_per_second_checksum)->by_default(100   )->as_number();
     this->minimum_steps_per_minute      =  this->kernel->config->value(minimum_steps_per_minute_checksum     )->by_default(3000  )->as_number();
+
+    this->trapezoid_adjusted_rate = 0.0;
 
     // Steppers start on by default
     this->turn_enable_pins_on();
@@ -179,27 +182,26 @@ uint32_t Stepper::trapezoid_generator_tick( uint32_t dummy ) {
     if(this->current_block && !this->paused && this->main_stepper->moving ) {
         uint32_t current_steps_completed = this->main_stepper->stepped;
 
-        if( previous_step_count == current_steps_completed && previous_step_count != 0 ){
-            // We must skip this step update because no step has happened
-            skipped_speed_updates++;
-            return 0;
-        }else{
-            previous_step_count = current_steps_completed;
-        }
-
         if( this->force_speed_update ){
           this->force_speed_update = false;
           this->set_step_events_per_minute(this->trapezoid_adjusted_rate);
           return 0;
         }
 
-        if(current_steps_completed <= this->current_block->accelerate_until) {
+        if (( previous_step_count == current_steps_completed ) && (skipped_speed_updates < 5)) {
+            // We must skip this step update because no step has happened
+            skipped_speed_updates++;
+            return 0;
+        }else{
+            previous_step_count = current_steps_completed;
+        } 
+        if(current_steps_completed < this->current_block->accelerate_until) {
               this->trapezoid_adjusted_rate += ( skipped_speed_updates + 1 ) * this->current_block->rate_delta;
               if (this->trapezoid_adjusted_rate > this->current_block->nominal_rate ) {
                   this->trapezoid_adjusted_rate = this->current_block->nominal_rate;
               }
               this->set_step_events_per_minute(this->trapezoid_adjusted_rate);
-        }else if (current_steps_completed > this->current_block->decelerate_after) {
+        }else if (current_steps_completed >= this->current_block->decelerate_after) {
               // NOTE: We will only reduce speed if the result will be > 0. This catches small
               // rounding errors that might leave steps hanging after the last trapezoid tick.
               if(this->trapezoid_adjusted_rate > this->current_block->rate_delta * 1.5) {
@@ -246,12 +248,16 @@ void Stepper::set_step_events_per_minute( double steps_per_minute ){
     if( steps_per_minute < this->minimum_steps_per_minute ){
         steps_per_minute = this->minimum_steps_per_minute;
     }
-
+    this->current_block->steps_finished = previous_step_count;
+    this->current_block->steps_per_minute = steps_per_minute;
 
     // Instruct the stepper motors
-    if( this->kernel->robot->alpha_stepper_motor->moving ){ this->kernel->robot->alpha_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[ALPHA_STEPPER] / (double)this->current_block->steps_event_count ) ); }
-    if( this->kernel->robot->beta_stepper_motor->moving  ){ this->kernel->robot->beta_stepper_motor->set_speed(  (steps_per_minute/60L) * ( (double)this->current_block->steps[BETA_STEPPER ] / (double)this->current_block->steps_event_count ) ); }
-    if( this->kernel->robot->gamma_stepper_motor->moving ){ this->kernel->robot->gamma_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[GAMMA_STEPPER] / (double)this->current_block->steps_event_count ) ); }
+//    if( this->kernel->robot->alpha_stepper_motor->moving ){ this->kernel->robot->alpha_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[ALPHA_STEPPER] / (double)this->current_block->steps_event_count ) ); }
+//    if( this->kernel->robot->beta_stepper_motor->moving  ){ this->kernel->robot->beta_stepper_motor->set_speed(  (steps_per_minute/60L) * ( (double)this->current_block->steps[BETA_STEPPER ] / (double)this->current_block->steps_event_count ) ); }
+//    if( this->kernel->robot->gamma_stepper_motor->moving ){ this->kernel->robot->gamma_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[GAMMA_STEPPER] / (double)this->current_block->steps_event_count ) ); }
+    this->kernel->robot->alpha_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[ALPHA_STEPPER] / (double)this->current_block->steps_event_count ) );
+    this->kernel->robot->beta_stepper_motor->set_speed(  (steps_per_minute/60L) * ( (double)this->current_block->steps[BETA_STEPPER ] / (double)this->current_block->steps_event_count ) );
+    this->kernel->robot->gamma_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[GAMMA_STEPPER] / (double)this->current_block->steps_event_count ) );
 
     this->kernel->call_event(ON_SPEED_CHANGE, this);
 

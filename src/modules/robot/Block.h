@@ -24,6 +24,7 @@ class Block {
     public:
         Block();
         double compute_factor_for_safe_speed();
+        void calculate_trapezoid_part( double entry_factor, double exit_factor, unsigned int steps_event_count );
         void calculate_trapezoid( double entry_factor, double exit_factor );
         double estimate_acceleration_distance( double initial_rate, double target_rate, double acceleration );
         double intersection_distance(double initial_rate, double final_rate, double acceleration, double distance);
@@ -54,7 +55,8 @@ class Block {
         unsigned int   accelerate_until;   // Stop accelerating after this number of steps
         unsigned int   decelerate_after;   // Start decelerating after this number of steps
         unsigned int   direction_bits;     // Direction for each axis in bit form, relative to the direction port's mask
-
+        unsigned int   steps_finished;     // steps already finished - for recalculation of actual move
+        double         steps_per_minute;   // actual rate - for recalculation
         int            index;              // index in queue - for debug
 
 

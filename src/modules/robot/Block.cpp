@@ -23,7 +23,8 @@ Block::Block(){
     this->is_ready = false;
     this->initial_rate = -1;
     this->final_rate = -1;
-    
+    this->steps_finished = 0;
+    this->steps_per_minute = 0.0;
     this->index = -1;
 }
 
@@ -47,12 +48,12 @@ double Block::compute_factor_for_safe_speed(){
 //                              |             + <- nominal_rate*exit_factor
 //                              +-------------+
 //                                  time -->
-void Block::calculate_trapezoid( double entryfactor, double exitfactor ){
+void Block::calculate_trapezoid_part( double entryfactor, double exitfactor, unsigned int steps_event_count){
 
     //this->player->kernel->streams->printf("%p calculating trapezoid\r\n", this);
 
-    this->initial_rate = ceil(this->nominal_rate * entryfactor);   // (step/min)
-    this->final_rate   = ceil(this->nominal_rate * exitfactor);    // (step/min)
+    this->initial_rate = ceil(entryfactor * (float)this->nominal_rate);   // (step/min) 
+    this->final_rate   = ceil(exitfactor * (float)this->nominal_rate);    // (step/min)
 
     //this->player->kernel->streams->printf("initrate:%f finalrate:%f\r\n", this->initial_rate, this->final_rate);
 
@@ -62,7 +63,7 @@ void Block::calculate_trapezoid( double entryfactor, double exitfactor ){
 
 
     // Calculate the size of Plateau of Nominal Rate.
-    int plateau_steps = this->steps_event_count-accelerate_steps-decelerate_steps;
+    int plateau_steps = steps_event_count-accelerate_steps-decelerate_steps;
 
     //this->player->kernel->streams->printf("accelperminute:%f accelerate_steps:%d decelerate_steps:%d plateau:%d \r\n", acceleration_per_minute, accelerate_steps, decelerate_steps, plateau_steps );
 
@@ -70,14 +71,19 @@ void Block::calculate_trapezoid( double entryfactor, double exitfactor ){
    // have to use intersection_distance() to calculate when to abort acceleration and start braking
    // in order to reach the final_rate exactly at the end of this block.
    if (plateau_steps < 0) {
-       accelerate_steps = ceil(this->intersection_distance(this->initial_rate, this->final_rate, acceleration_per_minute, this->steps_event_count));
+       accelerate_steps = ceil(this->intersection_distance(this->initial_rate, this->final_rate, acceleration_per_minute, steps_event_count));
        accelerate_steps = max( accelerate_steps, 0 ); // Check limits due to numerical round-off
-       accelerate_steps = min( accelerate_steps, int(this->steps_event_count) );
+       accelerate_steps = min( accelerate_steps, int(steps_event_count) );
        plateau_steps = 0;
    }
 
+   if (steps_event_count < this->steps_event_count) {
+       this->accelerate_until = this->steps_event_count + accelerate_steps - steps_event_count;
+       this->decelerate_after = this->steps_event_count + accelerate_steps+plateau_steps - steps_event_count; 
+   } else {
    this->accelerate_until = accelerate_steps;
    this->decelerate_after = accelerate_steps+plateau_steps;
+   }
 
    //this->debug(this->player->kernel);
 
@@ -87,6 +93,10 @@ void Block::calculate_trapezoid( double entryfactor, double exitfactor ){
         this->decelerate_after += floor( this->nominal_rate / 60 / this->planner->kernel->stepper->acceleration_ticks_per_second ) * 3;
     }
     */
+}
+
+void Block::calculate_trapezoid( double entryfactor, double exitfactor ){
+	calculate_trapezoid_part(entryfactor, exitfactor, this->steps_event_count);
 }
 
 // Calculates the distance (not time) it takes to accelerate from initial_rate to target_rate using the
@@ -134,7 +144,7 @@ void Block::reverse_pass(Block* next, Block* previous){
             // If nominal length true, max junction speed is guaranteed to be reached. Only compute
             // for max allowable speed if block is decelerating and nominal length is false.
             if ((!this->nominal_length_flag) && (this->max_entry_speed > next->entry_speed)) {
-                this->entry_speed = min( this->max_entry_speed, max_allowable_speed(-this->planner->acceleration,next->entry_speed,this->millimeters));
+                this->entry_speed = min( this->max_entry_speed, max_allowable_speed(-this->acceleration,next->entry_speed,this->millimeters));
             } else {
                 this->entry_speed = this->max_entry_speed;
             }
@@ -151,15 +161,24 @@ void Block::forward_pass(Block* previous, Block* next){
 
     if(!previous) { return; } // Begin planning after buffer_tail
 
+    unsigned int steps_finished = previous->steps_finished;
+
     // If the previous block is an acceleration block, but it is not long enough to complete the
     // full speed change within the block, we need to adjust the entry speed accordingly. Entry
     // speeds have already been reset, maximized, and reverse planned by reverse planner.
     // If nominal length is true, max junction speed is guaranteed to be reached. No need to recheck.
     if (!previous->nominal_length_flag) {
         if (previous->entry_speed < this->entry_speed) {
-          double entry_speed = min( this->entry_speed,
-            max_allowable_speed(-this->planner->acceleration,previous->entry_speed,previous->millimeters) );
-
+            double entry_speed = min( this->entry_speed, max_allowable_speed(-this->acceleration,previous->entry_speed,previous->millimeters) );
+            if (steps_finished > 0) {	// already moving and not accellerating, so previous->milimeters is smaller
+            	double speed = previous->steps_per_minute / previous->nominal_rate * nominal_speed;
+          		speed = max_allowable_speed(-this->acceleration,speed,previous->millimeters*(previous->steps_event_count-steps_finished)/previous->steps_event_count);
+                entry_speed = min( entry_speed, speed);
+                // previous is a active block with moving steppers -> detect early a higher speed needed
+                if (entry_speed > this->entry_speed) { // we are to slow -> quick increase accelerate_until
+                	previous->accelerate_until = previous->steps_event_count; // calculate properly afterwards in calculate_trapezoid_part
+                }
+            }
           // Check for junction speed change
           if (this->entry_speed != entry_speed) {
             this->entry_speed = entry_speed;
@@ -168,6 +187,10 @@ void Block::forward_pass(Block* previous, Block* next){
         }
     }
 
+    if (this->recalculate_flag || previous->recalculate_flag) {
+        previous->calculate_trapezoid_part(previous->entry_speed/previous->nominal_speed, this->entry_speed/previous->nominal_speed,previous->steps_event_count - steps_finished);
+        previous->recalculate_flag = false;
+    }
 }
 
 

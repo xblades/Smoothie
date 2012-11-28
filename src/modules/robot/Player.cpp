@@ -49,7 +49,7 @@ Block* Player::new_block(){
     block->initial_rate = -2;
     block->final_rate = -2;
     block->player = this;
-    
+    block->steps_per_minute = 0.0;
     block->index = index;
     
     return block;
