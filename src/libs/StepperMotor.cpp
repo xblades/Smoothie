@@ -43,8 +43,7 @@ void StepperMotor::tick(){
     this->fx_counter += (uint64_t)((uint64_t)1<<32);
 
     // if we are to step now 10t
-    if( this->fx_counter >= this->fx_ticks_per_step ){
-
+    if (( this->fx_counter >= this->fx_ticks_per_step ) && (this->fx_ticks_per_step>0)) {
         // output to pins 37t
         this->step_pin->set( 1                   );
         this->step_ticker->reset_step_pins = true;
