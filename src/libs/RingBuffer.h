@@ -18,20 +18,26 @@ template<class kind, int length> class RingBuffer {
         int          capacity();
         int          next_block_index(int index);
         int          prev_block_index(int index);
-        void         push_back(kind object);
+        int          push_back(kind object);
         void         pop_front(kind &object);
         void         get( int index, kind &object);
         kind*        get_ref( int index);
         void         delete_first();
+        int          is_valid(int index);
 
         kind         buffer[length];
+        int          valid[length];
         int          head;
         int          tail;
 };
 
 
 template<class kind, int length> RingBuffer<kind, length>::RingBuffer(){
+	int i;
     this->head = this->tail = 0;
+    for (i=0;i<length;i++) {
+    	valid[i]=0;
+    }
 }
 
 template<class kind, int length>  int RingBuffer<kind, length>::capacity(){
@@ -54,9 +60,12 @@ template<class kind, int length> int RingBuffer<kind, length>::prev_block_index(
     return(index);
 }
 
-template<class kind, int length> void RingBuffer<kind, length>::push_back(kind object){
+template<class kind, int length> int RingBuffer<kind, length>::push_back(kind object){
     this->buffer[this->tail] = object;
+    this->valid[this->tail] = 1;
+    int result = this->tail;
     this->tail = (tail+1)&(length-1);
+    return(result);
 }
 
 template<class kind, int length> void RingBuffer<kind, length>::get(int index, kind &object){
@@ -99,6 +108,12 @@ template<class kind, int length> void RingBuffer<kind, length>::delete_first(){
     //kind dummy;
     //this->pop_front(dummy);
     this->head = (this->head+1)&(length-1);
+}
+
+template<class kind, int length> int RingBuffer<kind, length>::is_valid(int index){
+    //kind dummy;
+    //this->pop_front(dummy);
+    return(this->valid[index]);
 }
 
 

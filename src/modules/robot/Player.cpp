@@ -40,7 +40,7 @@ Block* Player::new_block(){
     }
     
     // Create a new virgin Block in the queue
-    this->queue.push_back(Block());
+    int index = this->queue.push_back(Block());
     block = this->queue.get_ref( this->queue.size()-1 );
     while( block == NULL ){
         block = this->queue.get_ref( this->queue.size()-1 );
@@ -49,6 +49,8 @@ Block* Player::new_block(){
     block->initial_rate = -2;
     block->final_rate = -2;
     block->player = this;
+    
+    block->index = index;
     
     return block;
 }

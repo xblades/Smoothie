@@ -23,6 +23,8 @@ Block::Block(){
     this->is_ready = false;
     this->initial_rate = -1;
     this->final_rate = -1;
+    
+    this->index = -1;
 }
 
 void Block::debug(Kernel* kernel){
