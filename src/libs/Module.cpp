@@ -29,3 +29,5 @@ void Module::on_config_reload(         void * argument){}
 void Module::on_play(                  void * argument){}
 void Module::on_pause(                 void * argument){}
 void Module::on_idle(                  void * argument){}
+void Module::on_start(                 void * argument){}
+void Module::on_finish(                void * argument){}

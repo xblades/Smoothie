@@ -57,6 +57,7 @@ void Endstops::on_gcode_received(void* argument){
 
             // First wait for the queue to be empty
             while(this->kernel->player->queue.size() > 0) { wait_us(500); }
+            this->kernel->call_event(ON_START);
 
             // Do we move select axes or all of them
             char axes_to_move = ( ( gcode->has_letter('X') || gcode->has_letter('Y') || gcode->has_letter('Z') ) ? 0x00 : 0xff );
@@ -149,6 +150,7 @@ void Endstops::on_gcode_received(void* argument){
             // Homing is done
             this->status = NOT_HOMING;
         
+            this->kernel->call_event(ON_FINISH);
         }
     }
 }

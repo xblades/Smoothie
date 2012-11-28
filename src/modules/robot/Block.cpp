@@ -222,12 +222,12 @@ void Block::release(){
                         player->current_block->release();
                     }
                 }else{
-
                     player->current_block = NULL;
-
+                    player->kernel->call_event(ON_FINISH);
                 }
             }else{
                 player->current_block = NULL;
+                player->kernel->call_event(ON_FINISH);
             }
         }
     }

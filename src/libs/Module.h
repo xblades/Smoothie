@@ -31,6 +31,8 @@ class Module {
         virtual void on_play(                   void * argument);
         virtual void on_pause(                  void * argument);
         virtual void on_idle(                   void * argument);
+        virtual void on_start(                  void * argument);
+        virtual void on_finish(                 void * argument);
         Kernel * kernel;
 };
 

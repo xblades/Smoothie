@@ -56,6 +56,7 @@ Block* Player::new_block(){
 // Used by blocks to signal when they are ready to be used by the system
 void Player::new_block_added(){
     if( this->current_block == NULL ){
+    	this->kernel->call_event(ON_START);
         this->pop_and_process_new_block(33);
     }
 }
