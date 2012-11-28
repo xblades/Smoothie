@@ -25,6 +25,7 @@ Config::Config(){
 
     // Config source for */config files
     this->config_sources.push_back( new FileConfigSource("/local/config", LOCAL_CONFIGSOURCE_CHECKSUM) );
+    this->config_sources.push_back( new FileConfigSource("/fd/config",    FD_CONFIGSOURCE_CHECKSUM   ) );
     this->config_sources.push_back( new FileConfigSource("/sd/config",    SD_CONFIGSOURCE_CHECKSUM   ) );
 
     // Pre-load the config cache

@@ -24,6 +24,7 @@ using namespace std;
 
 #define LOCAL_CONFIGSOURCE_CHECKSUM     13581
 #define SD_CONFIGSOURCE_CHECKSUM        19415
+#define FD_CONFIGSOURCE_CHECKSUM        12746
 
 
 class Config : public Module {
