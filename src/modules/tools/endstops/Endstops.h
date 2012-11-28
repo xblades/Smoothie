@@ -35,6 +35,9 @@
 #define alpha_homing_retract_checksum    4419
 #define beta_homing_retract_checksum     48344
 #define gamma_homing_retract_checksum    54848
+#define alpha_invert_endstop_checksum    52065
+#define beta_invert_endstop_checksum     30710
+#define gamma_invert_endstop_checksum    37214
 
 
 class Endstops : public Module{
@@ -49,6 +52,7 @@ class Endstops : public Module{
         double  slow_rates[3];
         double  fast_rates[3];
         unsigned int  retract_steps[3];
+        bool  invert[3];
         char status;
 };
 

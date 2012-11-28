@@ -46,6 +46,9 @@ void Endstops::on_config_reload(void* argument){
     this->retract_steps[0]           = this->kernel->config->value(alpha_homing_retract_checksum       )->by_default("30" )->as_number();
     this->retract_steps[1]           = this->kernel->config->value(beta_homing_retract_checksum        )->by_default("30" )->as_number();
     this->retract_steps[2]           = this->kernel->config->value(gamma_homing_retract_checksum       )->by_default("10" )->as_number();
+    this->invert[0]                  = this->kernel->config->value(alpha_invert_endstop_checksum       )->by_default(false)->as_bool();
+    this->invert[1]                  = this->kernel->config->value(beta_invert_endstop_checksum        )->by_default(false)->as_bool();
+    this->invert[2]                  = this->kernel->config->value(gamma_invert_endstop_checksum       )->by_default(false)->as_bool();
 }
 
 // Start homing sequences by response to GCode commands
@@ -72,8 +75,10 @@ void Endstops::on_gcode_received(void* argument){
             this->status = MOVING_TO_ORIGIN_FAST;
             for( char c = 'X'; c <= 'Z'; c++ ){
                 if( ( axes_to_move >> ( c - 'X' ) ) & 1 ){
+                	int direction = 0;
+                    if (this->invert[c - 'X']) direction = 1;
                     this->steppers[c - 'X']->set_speed(this->fast_rates[c -'X']);
-                    this->steppers[c - 'X']->move(1,10000000);
+                    this->steppers[c - 'X']->move(direction,10000000); 
                 }
             }
 
@@ -102,8 +107,10 @@ void Endstops::on_gcode_received(void* argument){
             this->status = MOVING_BACK;
             for( char c = 'X'; c <= 'Z'; c++ ){
                 if( ( axes_to_move >> ( c - 'X' ) ) & 1 ){
+                	int direction = 1;
+                    if (this->invert[c - 'X']) direction = 0;
                     this->steppers[c - 'X']->set_speed(this->slow_rates[c - 'X']);
-                    this->steppers[c - 'X']->move(0,this->retract_steps[c - 'X']);
+                    this->steppers[c - 'X']->move(direction,this->retract_steps[c - 'X']); 
                 }
             }
 
@@ -122,8 +129,10 @@ void Endstops::on_gcode_received(void* argument){
             this->status = MOVING_TO_ORIGIN_SLOW;
             for( char c = 'X'; c <= 'Z'; c++ ){
                 if( ( axes_to_move >> ( c - 'X' ) ) & 1 ){
+                	int direction = 0;
+                    if (this->invert[c - 'X']) direction = 1;
                     this->steppers[c - 'X']->set_speed(this->slow_rates[c -'X']);
-                    this->steppers[c - 'X']->move(1,10000000);
+                    this->steppers[c - 'X']->move(direction,10000000); 
                 }
             }
 
