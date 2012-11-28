@@ -174,7 +174,8 @@ void Block::forward_pass(Block* previous, Block* next){
 // Gcodes are attached to their respective blocks so that on_gcode_execute can be called with it
 void Block::append_gcode(Gcode* gcode){
    __disable_irq();
-   this->gcodes.push_back(*gcode);
+// this leads to Hard Fault - guess its not released with the block
+//   this->gcodes.push_back(*gcode);
    __enable_irq();
 }
 
