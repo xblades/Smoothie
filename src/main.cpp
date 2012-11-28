@@ -16,16 +16,20 @@
 #include "modules/utils/configurator/Configurator.h"
 #include "modules/utils/currentcontrol/CurrentControl.h"
 #include "modules/utils/pausebutton/PauseButton.h"
-#include "libs/ChaNFSSD/SDFileSystem.h"
 #include "libs/Config.h"
 #include "libs/nuts_bolts.h"
 #include "libs/utils.h"
 
-#include "libs/USBCDCMSC/USBCDCMSC.h"
-SDFileSystem sd(p5, p6, p7, p8, "sd");  // LPC17xx specific : comment if you are not using a SD card ( for example with a mBed ).
-//LocalFileSystem local("local");       // LPC17xx specific : comment if you are not running a mBed
-USBCDCMSC cdcmsc(&sd);                  // LPC17xx specific : Composite serial + msc USB device
+//#include "libs/ChaNFSSD/SDFileSystem.h"
+//#include "libs/USBCDCMSC/USBCDCMSC.h"
+//SDFileSystem sd(p5, p6, p7, p8, "sd");  // LPC17xx specific : comment if you are not using a SD card ( for example with a mBed ).
+//LocalFileSystem local("local");       // LPC17xx specific : comment if you are not running a mBed
+//USBCDCMSC cdcmsc(&sd);                  // LPC17xx specific : Composite serial + msc USB device
 
+#include "libs/ChaNFSFD/FDFileSystem.h"
+#include "libs/USBCDCMSCF/USBCDCMSCF.h"
+FDFileSystem fd(P0_19, P0_20, "fd");	// LPC17xx specific : comment if you are not using a SDÂ card ( for example with a mBed ).
+USBCDCMSCF cdcmscf(&fd);                // LPC17xx specific :Â Composite serial + msc USB device
 
 int main() {
 
@@ -43,7 +47,8 @@ int main() {
     kernel->add_module( new PauseButton() );
     kernel->add_module( new Endstops() );
 
-    kernel->add_module( &cdcmsc );
+  //  kernel->add_module( &cdcmsc );
+    kernel->add_module((Module*) &cdcmscf );
    
     kernel->streams->printf("start\r\n");
 
