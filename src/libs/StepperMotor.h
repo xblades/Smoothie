@@ -51,8 +51,6 @@ class StepperMotor {
         Pin* dir_pin;
         Pin* en_pin;
 
-        double steps_per_second;
-
         bool moving;
         bool paused;
 

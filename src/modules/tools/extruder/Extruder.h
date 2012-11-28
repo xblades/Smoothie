@@ -50,6 +50,7 @@ class Extruder : public Module{
         double          steps_per_millimeter;         // Steps to travel one millimeter
         double          feed_rate;                    //
         double          acceleration;                 //
+        unsigned int    current_rate;
 
         int             counter_increment;
         int             step_counter;

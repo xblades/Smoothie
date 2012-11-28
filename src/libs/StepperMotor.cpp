@@ -136,9 +136,6 @@ void StepperMotor::set_speed( double speed ){
         return;
     }
 
-    // How many steps we must output per second
-    this->steps_per_second = speed;
-
     // How many ticks ( base steps ) between each actual step at this speed, in fixed point 64
     double ticks_per_step = (double)( (double)this->step_ticker->frequency / speed );
     double double_fx_ticks_per_step = (double)(1<<16) * ( (double)(1<<16) * ticks_per_step );

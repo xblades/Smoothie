@@ -21,7 +21,7 @@
 */
 
 Extruder::Extruder() {
-    this->absolute_mode = true;
+    this->absolute_mode = false;
     this->step_counter = 0;
     this->counter_increment = 0;
     this->paused = false;
@@ -36,7 +36,7 @@ void Extruder::on_module_loaded() {
     this->on_config_reload(this);
 
     // We start with the enable pin off
-    this->en_pin->set(1);
+    this->en_pin->set(0);
 
     // We work on the same Block as Stepper, so we need to know when it gets a new one and drops one
     this->register_for_event(ON_BLOCK_BEGIN);
@@ -60,7 +60,8 @@ void Extruder::on_module_loaded() {
     // Stepper motor object for the extruder
     this->stepper_motor  = this->kernel->step_ticker->add_stepper_motor( new StepperMotor(this->step_pin,this->dir_pin,this->en_pin) );
     this->stepper_motor->attach(this, &Extruder::stepper_motor_finished_move );
-
+    this->stepper_motor->set_speed(0);
+    this->current_rate = 0;
 }
 
 // Get config
@@ -121,6 +122,8 @@ void Extruder::on_gcode_execute(void* argument){
 
                 // If the robot is moving, we follow it's movement, otherwise, we move alone
                 if( fabs(gcode->millimeters_of_travel) < 0.0001 ){  // With floating numbers, we can have 0 != 0 ... beeeh. For more info see : http://upload.wikimedia.org/wikipedia/commons/0/0a/Cain_Henri_Vidal_Tuileries.jpg
+                    this->current_rate = 0;
+                    this->stepper_motor->set_speed(current_rate); 
                     this->mode = SOLO;
                     this->travel_distance = relative_extrusion_distance;
                     if( gcode->has_letter('F') ){ this->feed_rate = gcode->get_value('F'); }
@@ -212,16 +215,17 @@ uint32_t Extruder::acceleration_tick(uint32_t dummy){
     // Avoid trying to work when we really shouldn't ( between blocks or re-entry )
     if( this->current_block == NULL ||  this->paused || this->mode != SOLO ){ return 0; }
 
-    uint32_t current_rate = this->stepper_motor->steps_per_second;
+//    uint32_t current_rate = this->stepper_motor->steps_per_second;
     uint32_t target_rate = int(floor((this->feed_rate/60)*this->steps_per_millimeter));
 
-    if( current_rate < target_rate ){
+    if( this->current_rate < target_rate ){
         uint32_t rate_increase = int(floor((this->acceleration/this->kernel->stepper->acceleration_ticks_per_second)*this->steps_per_millimeter));
-        current_rate = min( target_rate, current_rate + rate_increase );
+        this->current_rate = min( target_rate, this->current_rate + rate_increase );
     }
     if( current_rate > target_rate ){ current_rate = target_rate; }
 
-    this->stepper_motor->set_speed(max(current_rate, this->kernel->stepper->minimum_steps_per_minute/60));
+	this->current_rate = max(this->current_rate, this->kernel->stepper->minimum_steps_per_minute/60);
+    this->stepper_motor->set_speed(this->current_rate); 
 
     return 0;
 }
