@@ -22,6 +22,7 @@
 #include "modules/robot/Robot.h"
 #include "modules/robot/Stepper.h"
 #include "modules/robot/Player.h"
+#include "modules/utils/steppercontrol/StepperControl.h"
 #include <malloc.h>
 
 
@@ -39,7 +40,9 @@ const ModuleCallback kernel_callback_functions[NUMBER_OF_DEFINED_EVENTS] = {
         &Module::on_config_reload,
         &Module::on_play,
         &Module::on_pause,
-        &Module::on_idle
+        &Module::on_idle,
+        &Module::on_start,
+        &Module::on_finish
 };
 
 #define baud_rate_setting_checksum 10922
@@ -89,6 +92,8 @@ Kernel::Kernel(){
     this->step_ticker          = new StepTicker();
     this->adc                  = new Adc();
     this->digipot              = new Digipot();
+    this->steppercontrol       = new StepperControl(P0_9,P0_8,P0_7);
+    this->add_module( this->steppercontrol );
 
     // LPC17xx-specific
     NVIC_SetPriorityGrouping(0);
@@ -126,7 +131,6 @@ Kernel::Kernel(){
     this->add_module( this->planner        = new Planner()       );
     this->add_module( this->player         = new Player()        );
     this->add_module( this->pauser         = new Pauser()        );
-
 
 }
 

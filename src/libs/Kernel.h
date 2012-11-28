@@ -20,9 +20,10 @@
 #include "modules/robot/Planner.h"
 #include "modules/robot/Robot.h"
 #include "modules/robot/Stepper.h"
+#include "modules/utils/steppercontrol/StepperControl.h"
 
 // See : http://smoothieware.org/listofevents
-#define NUMBER_OF_DEFINED_EVENTS   12
+#define NUMBER_OF_DEFINED_EVENTS   14
 #define ON_MAIN_LOOP               0
 #define ON_CONSOLE_LINE_RECEIVED   1
 #define ON_GCODE_RECEIVED          2
@@ -35,6 +36,8 @@
 #define ON_PLAY                    9
 #define ON_PAUSE                   10
 #define ON_IDLE                    11
+#define ON_START                   12
+#define ON_FINISH                  13
 
 
 typedef void (Module::*ModuleCallback)(void * argument);
@@ -62,6 +65,7 @@ class Kernel {
         Config*           config;
         Player*           player;
         Pauser*           pauser;
+        StepperControl*   steppercontrol;
 
         int debug;
         SlowTicker*       slow_ticker;
