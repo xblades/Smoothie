@@ -54,6 +54,8 @@ class Block {
         unsigned int   decelerate_after;   // Start decelerating after this number of steps
         unsigned int   direction_bits;     // Direction for each axis in bit form, relative to the direction port's mask
 
+        int            index;              // index in queue - for debug
+
 
         uint8_t recalculate_flag; // Planner flag to recalculate trapezoids on entry junction
         uint8_t nominal_length_flag; // Planner flag for nominal speed always reached
