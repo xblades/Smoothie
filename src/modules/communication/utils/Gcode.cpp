@@ -65,4 +65,16 @@ void Gcode::prepare_cached_values(){
     }else{
         this->has_m = false;
     }
+    if( this->has_letter('E') ){
+        this->has_e = true;
+        this->e = this->get_value('E');
+    }else{
+        this->has_e = false;
+    }
+    if( this->has_letter('F') ){
+        this->has_f = true;
+        this->f = this->get_value('F');
+    }else{
+        this->has_f = false;
+    }
 }

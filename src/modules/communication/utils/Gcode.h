@@ -28,8 +28,12 @@ class Gcode {
 
         bool has_m;
         bool has_g;
+        bool has_e;
+        bool has_f;
         unsigned int m;
         unsigned int g;
+        double e;
+        double f;
 
         StreamOutput* stream;
 };
