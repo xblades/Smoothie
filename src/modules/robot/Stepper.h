@@ -78,6 +78,7 @@ class Stepper : public Module {
         bool paused;
         bool force_speed_update;
         bool enable_pins_status;
+        bool running;
         Hook* acceleration_tick_hook;
 
         StepperMotor* main_stepper;

@@ -24,7 +24,7 @@ uint32_t speed_ticks_counter;
 
 
 Stepper::Stepper(){
-    this->current_block = NULL;
+    this->running = false;
     this->paused = false;
     this->trapezoid_generator_busy = false;
     this->force_speed_update = false;
@@ -137,6 +137,7 @@ void Stepper::on_block_begin(void* argument){
     if( block->steps[GAMMA_STEPPER] > 0 ){ this->kernel->robot->gamma_stepper_motor->move( ( block->direction_bits >> 2  ) & 1 , block->steps[GAMMA_STEPPER] ); }
 
     this->current_block = block;
+	this->running = true;
 
     // Setup acceleration for this block
     this->trapezoid_generator_reset();
@@ -153,7 +154,8 @@ void Stepper::on_block_begin(void* argument){
 
 // Current block is discarded
 void Stepper::on_block_end(void* argument){
-    this->current_block = NULL; //stfu !
+	this->running = false;
+//    this->current_block = NULL; //stfu !
 }
 
 //#pragma GCC push_options
@@ -166,7 +168,8 @@ uint32_t Stepper::stepper_motor_finished_move(uint32_t dummy){
     if( this->kernel->robot->alpha_stepper_motor->moving || this->kernel->robot->beta_stepper_motor->moving || this->kernel->robot->gamma_stepper_motor->moving ){ return 0; }
 
     // This block is finished, release it
-    if( this->current_block != NULL ){
+    if (this->running) {
+        this->running = false;
         this->current_block->release();
     }
 
@@ -179,7 +182,7 @@ uint32_t Stepper::stepper_motor_finished_move(uint32_t dummy){
 // current_block stays untouched by outside handlers for the duration of this function call.
 uint32_t Stepper::trapezoid_generator_tick( uint32_t dummy ) {
 
-    if(this->current_block && !this->paused && this->main_stepper->moving ) {
+    if(this->running && !this->paused && this->main_stepper->moving ) {
         uint32_t current_steps_completed = this->main_stepper->stepped;
 
         if( this->force_speed_update ){
@@ -260,7 +263,6 @@ void Stepper::set_step_events_per_minute( double steps_per_minute ){
     this->kernel->robot->gamma_stepper_motor->set_speed( (steps_per_minute/60L) * ( (double)this->current_block->steps[GAMMA_STEPPER] / (double)this->current_block->steps_event_count ) );
 
     this->kernel->call_event(ON_SPEED_CHANGE, this);
-
 }
 
 // This function has the role of making sure acceleration and deceleration curves have their
