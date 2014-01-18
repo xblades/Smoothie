@@ -21,7 +21,8 @@ Planner::Planner(){
     clear_vector(this->position);
     clear_vector_double(this->previous_unit_vec);
     this->previous_nominal_speed = 0.0;
-
+    this->previous_nominal_rate = 0.0;
+    this->previous_entry_speed = 0.0;
 }
 
 void Planner::on_module_loaded(){
@@ -77,8 +78,9 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
             block->nominal_speed = block->millimeters * inverse_minute;           // (mm/min) Always > 0
             block->nominal_rate = ceil(block->steps_event_count * inverse_minute); // (step/min) Always > 0
         }else{
-            block->nominal_speed = 0;
-            block->nominal_rate = 0;
+            block->nominal_speed = this->previous_nominal_speed;
+            block->nominal_rate = this->previous_nominal_rate;
+            block->entry_speed = this->previous_entry_speed;
         }
 
         //this->kernel->streams->printf("nom_speed: %f nom_rate: %u step_event_count: %u block->steps_z: %u \r\n", block->nominal_speed, block->nominal_rate, block->steps_event_count, block->steps[2]  );
@@ -128,11 +130,17 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
             }
           }
         }
-        block->max_entry_speed = vmax_junction;
    
         // Initialize block entry speed. Compute based on deceleration to user-defined MINIMUM_PLANNER_SPEED.
         double v_allowable = this->max_allowable_speed(-acceleration,0.0,block->millimeters); //TODO: Get from config
+        if( distance > 0 ){ 
+    	    block->max_entry_speed = vmax_junction;
         block->entry_speed = min(vmax_junction, v_allowable);
+	    } else {
+    	    block->max_entry_speed = this->previous_max_entry_speed;
+    		block->entry_speed = this->previous_entry_speed;
+	    }
+
 
         // Initialize planner efficiency flags
         // Set flag if block will always reach maximum junction speed regardless of entry/exit speeds.
@@ -147,8 +155,13 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
         block->recalculate_flag = true; // Always calculate trapezoid for new block
  
         // Update previous path unit_vector and nominal speed
-        memcpy(this->previous_unit_vec, unit_vec, sizeof(unit_vec)); // previous_unit_vec[] = unit_vec[]
+        if( distance > 0 ){ 
+          memcpy(this->previous_unit_vec, unit_vec, sizeof(unit_vec)); // previous_unit_vec[] = unit_vec[]
+     	}
         this->previous_nominal_speed = block->nominal_speed;
+        this->previous_nominal_rate = block->nominal_rate;
+        this->previous_entry_speed = block->entry_speed;
+        this->previous_max_entry_speed = block->max_entry_speed;
     
         // Update current position
         memcpy(this->position, target, sizeof(int)*3);
