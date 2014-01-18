@@ -24,7 +24,7 @@ using namespace std;
 class Planner : public Module {
     public:
         Planner();
-        void append_block(Gcode* gcode, bool moving, int target[], double feed_rate, double acceleration, double distance, double deltas[] );
+        void append_block(Gcode* gcode, bool moving, int target[], double feed_rate, double acceleration, double millimeters, double distance, double deltas[] );
         double max_allowable_speed( double acceleration, double target_velocity, double distance);
         void recalculate();
         void reverse_pass();

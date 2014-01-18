@@ -36,7 +36,7 @@ void Planner::on_config_reload(void* argument){
 
 
 // Append a block to the queue, compute it's speed factors
-void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_rate, double acceleration, double distance, double deltas[] ){
+void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_rate, double acceleration, double millimeters, double distance, double deltas[] ){
 
     //printf("new block\r\n");
 
@@ -54,8 +54,8 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
     // Direction bits
     block->direction_bits = 0;
     block->acceleration = acceleration;
-    block->millimeters = distance;
-
+    block->millimeters = millimeters;
+    block->distance = distance;
     if (moving) {
         for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){
             if( target[stepper] < position[stepper] ){ block->direction_bits |= (1<<stepper); }
@@ -69,12 +69,12 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
         //if( block->steps_event_count == 0 ){ this->computing = false; return; }
 
         double inverse_millimeters = 0;
-        if( distance > 0 ){ inverse_millimeters = 1.0/distance; }
+        if( millimeters > 0 ){ inverse_millimeters = 1.0/millimeters; }
 
         // Calculate speed in mm/minute for each axis. No divide by zero due to previous checks.
         // NOTE: Minimum stepper speed is limited by MINIMUM_STEPS_PER_MINUTE in stepper.c
         double inverse_minute = feed_rate * inverse_millimeters;
-        if( distance > 0 ){
+        if( millimeters > 0 ){ 		
             block->nominal_speed = block->millimeters * inverse_minute;           // (mm/min) Always > 0
             block->nominal_rate = ceil(block->steps_event_count * inverse_minute); // (step/min) Always > 0
         }else{
@@ -133,7 +133,7 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
    
         // Initialize block entry speed. Compute based on deceleration to user-defined MINIMUM_PLANNER_SPEED.
         double v_allowable = this->max_allowable_speed(-acceleration,0.0,block->millimeters); //TODO: Get from config
-        if( distance > 0 ){ 
+        if( millimeters > 0 ){ 
     	    block->max_entry_speed = vmax_junction;
         block->entry_speed = min(vmax_junction, v_allowable);
 	    } else {
@@ -141,6 +141,8 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
     		block->entry_speed = this->previous_entry_speed;
 	    }
 
+    //if ( (deltas[X_AXIS]==0) && (deltas[Y_AXIS]==0) && (deltas[Z_AXIS]!=0) )    
+    //	printf("di%f  bmes%f  es%f  ns%f  va%f  ac%f  fr%f  bm%f  im%f  im%f  bs%d\r\n",millimeters,block->max_entry_speed,block->entry_speed,block->nominal_speed,v_allowable,acceleration,feed_rate,block->millimeters,inverse_millimeters,inverse_minute,block->steps_event_count);
 
         // Initialize planner efficiency flags
         // Set flag if block will always reach maximum junction speed regardless of entry/exit speeds.
@@ -155,7 +157,7 @@ void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_
         block->recalculate_flag = true; // Always calculate trapezoid for new block
  
         // Update previous path unit_vector and nominal speed
-        if( distance > 0 ){ 
+        if( millimeters > 0 ){ 
           memcpy(this->previous_unit_vec, unit_vec, sizeof(unit_vec)); // previous_unit_vec[] = unit_vec[]
      	}
         this->previous_nominal_speed = block->nominal_speed;

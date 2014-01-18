@@ -41,7 +41,8 @@ class Block {
         unsigned int   steps_event_count;  // Steps for the longest axis
         unsigned int   nominal_rate;       // Nominal rate in steps per minute
         float          nominal_speed;      // Nominal speed in mm per minute
-        float          millimeters;        // Distance for this move
+        float          millimeters;        // Distance for this move and backlash
+        float          distance;           // Distance for this move 
         double         entry_speed;
         double         acceleration;
         float          rate_delta;         // Nomber of steps to add to the speed for each acceleration tick

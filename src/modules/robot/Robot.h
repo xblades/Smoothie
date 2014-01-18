@@ -31,6 +31,9 @@ using std::string;
 #define x_acceleration_checksum                53446
 #define y_acceleration_checksum                57031
 #define z_acceleration_checksum                60616
+#define x_axis_backlash_checksum               37162
+#define y_axis_backlash_checksum               41003
+#define z_axis_backlash_checksum               44844
 
 #define NEXT_ACTION_DEFAULT 0
 #define NEXT_ACTION_DWELL 1
@@ -86,6 +89,8 @@ class Robot : public Module {
         BaseSolution* arm_solution;                           // Selected Arm solution ( millimeters to step calculation )
         double mm_per_line_segment;                           // Setting : Used to split lines into segments
         double mm_per_arc_segment;                            // Setting : Used to split arcs into segmentrs
+        bool axis_direction[3];                               // Memory last motion direction to insert backlash when changing
+        double axis_backlash[3];                              // Setting : Stores backlash of axis
         
         // Number of arc generation iterations by small angle approximation before exact arc trajectory
         // correction. This parameter maybe decreased if there are issues with the accuracy of the arc

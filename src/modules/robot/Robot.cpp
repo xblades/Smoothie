@@ -27,6 +27,12 @@ Robot::Robot(){
     this->select_plane(X_AXIS, Y_AXIS, Z_AXIS);
     clear_vector(this->current_position);
     clear_vector(this->last_milestone);
+    this->axis_direction[0] = false;	// left move
+    this->axis_direction[1] = false;	// left move
+    this->axis_direction[2] = false;	// left move
+    this->axis_backlash[0] = 0.0; 
+    this->axis_backlash[1] = 0.0; 
+    this->axis_backlash[2] = 0.0; 
 }
 
 //Called when the module has just been loaded
@@ -41,7 +47,6 @@ void Robot::on_module_loaded() {
     this->alpha_stepper_motor  = this->kernel->step_ticker->add_stepper_motor( new StepperMotor(this->alpha_step_pin,this->alpha_dir_pin,this->alpha_en_pin) );
     this->beta_stepper_motor   = this->kernel->step_ticker->add_stepper_motor( new StepperMotor(this->beta_step_pin, this->beta_dir_pin, this->beta_en_pin ) );
     this->gamma_stepper_motor  = this->kernel->step_ticker->add_stepper_motor( new StepperMotor(this->gamma_step_pin,this->gamma_dir_pin,this->gamma_en_pin) );
-
 }
 
 void Robot::on_config_reload(void* argument){
@@ -66,7 +71,9 @@ void Robot::on_config_reload(void* argument){
     this->axis_acceleration[X_AXIS] = this->kernel->config->value(x_acceleration_checksum       )->by_default(-1 )->as_number();
     this->axis_acceleration[Y_AXIS] = this->kernel->config->value(y_acceleration_checksum       )->by_default(-1 )->as_number();
     this->axis_acceleration[Z_AXIS] = this->kernel->config->value(z_acceleration_checksum       )->by_default(-1 )->as_number();
-
+    this->axis_backlash[X_AXIS]  = this->kernel->config->value(x_axis_backlash_checksum   )->by_default(0.0)->as_number();
+    this->axis_backlash[Y_AXIS]  = this->kernel->config->value(y_axis_backlash_checksum   )->by_default(0.0)->as_number();
+    this->axis_backlash[Z_AXIS]  = this->kernel->config->value(z_axis_backlash_checksum   )->by_default(0.0)->as_number();
 }
 
 //A GCode has been received
@@ -133,7 +140,7 @@ void Robot::execute_gcode(Gcode* gcode){
        // mark this gcode to be executed	    
        gcode->call_on_gcode_execute_event_immediatly = true;    // mark executeable gcode for append
        // add a block without move_information to insure execute the gcode in order
-       this->kernel->planner->append_block(gcode, false, 0, 0, 0, 0, deltas ); 
+        this->kernel->planner->append_block(gcode, false, 0, 0, 0, 0, 0, deltas ); 
        return; 
    }
     
@@ -152,7 +159,11 @@ void Robot::execute_gcode(Gcode* gcode){
     switch( next_action ){
         case NEXT_ACTION_DEFAULT:
             switch(this->motion_mode){
-                case MOTION_MODE_CANCEL: break;
+                case MOTION_MODE_CANCEL: 
+                    if( gcode->on_gcode_execute_event_called == false ){
+//				        this->append_milestone(this->current_position, 0.0);
+                    }
+                break;
                 case MOTION_MODE_SEEK  : this->append_line(gcode, target, this->seek_rate ); break;
                 case MOTION_MODE_LINEAR: this->append_line(gcode, target, this->feed_rate ); break;
                 case MOTION_MODE_CW_ARC: case MOTION_MODE_CCW_ARC: this->compute_arc(gcode, offset, target ); break;
@@ -175,15 +186,43 @@ void Robot::execute_gcode(Gcode* gcode){
 // Convert target from millimeters to steps, and append this to the planner
 void Robot::append_milestone(Gcode* gcode, double target[], double rate ){
     int steps[3]; //Holds the result of the conversion
+    double corrected_target[3];
    
-    this->arm_solution->millimeters_to_steps( target, steps );
+//    this->arm_solution->millimeters_to_steps( target, steps );
     
     double deltas[3];
     double acceleration_value = this->acceleration;
-    for(int axis=X_AXIS;axis<=Z_AXIS;axis++){deltas[axis]=target[axis]-this->last_milestone[axis];}
+    for(int axis=X_AXIS;axis<=Z_AXIS;axis++){
+        deltas[axis]=target[axis]-this->last_milestone[axis];
+	}
+    double distance = sqrt( pow( deltas[X_AXIS], 2 ) +  pow( deltas[Y_AXIS], 2 ) +  pow( deltas[Z_AXIS], 2 ) );  
+    if (distance<0.000000001) distance = 0; // correct for rounding errors
 
+    for(int axis=X_AXIS;axis<=Z_AXIS;axis++){
+        // check for direction change -> if so add backlash to deltas[axis]
+        if (((deltas[axis]<0) && (axis_direction[axis])) || ((deltas[axis]>0) && (! axis_direction[axis])))  {
+            axis_direction[axis] = !axis_direction[axis];
+            if (axis_direction[axis]) {
+                deltas[axis] += this->axis_backlash[axis];
+//printf("Adding %f to axis %i : delta %f\r\n",this->axis_backlash[axis],axis,deltas[axis]); 
+    	    } else {
+                deltas[axis] -= this->axis_backlash[axis];
+//printf("Subtracting %f from axis %i : delta %f\r\n",this->axis_backlash[axis],axis,deltas[axis]); 
+    	    }
+    	}
+  		// correct steps according direction
+    	if (axis_direction[axis]) {
+    		corrected_target[axis] = target[axis] + this->axis_backlash[axis]/2;
+    	} else {
+    		corrected_target[axis] = target[axis] - this->axis_backlash[axis]/2;
+    	}
+    }
+    this->arm_solution->millimeters_to_steps( corrected_target, steps );
     
     double millimeters_of_travel = sqrt( pow( deltas[X_AXIS], 2 ) +  pow( deltas[Y_AXIS], 2 ) +  pow( deltas[Z_AXIS], 2 ) );
+    if (millimeters_of_travel<0.000000001) millimeters_of_travel = 0; // correct for rounding errors
+    
+//    double millimeters_of_travel = sqrt( pow( corrected_deltas[X_AXIS], 2 ) +  pow( corrected_deltas[Y_AXIS], 2 ) +  pow( corrected_deltas[Z_AXIS], 2 ) );      
     
     double duration = 0;
     if( rate > 0 ){ duration = millimeters_of_travel / rate; }
@@ -203,8 +242,8 @@ void Robot::append_milestone(Gcode* gcode, double target[], double rate ){
         }
     }
 
-    this->kernel->planner->append_block(gcode, true, steps, rate*60, acceleration_value, millimeters_of_travel, deltas ); 
-
+    this->kernel->planner->append_block(gcode, true, steps, rate*60, acceleration_value, millimeters_of_travel, distance, deltas ); 
+//printf("GCODE D: %s \r\n", gcode->command.c_str() ); 
 
     memcpy(this->last_milestone, target, sizeof(double)*3); // this->last_milestone[] = target[];
 }
