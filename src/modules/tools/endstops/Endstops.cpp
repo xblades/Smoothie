@@ -20,7 +20,7 @@ Endstops::Endstops(){
 }
 
 void Endstops::on_module_loaded() {
-    this->register_for_event(ON_GCODE_RECEIVED);
+    this->register_for_event(ON_GCODE_EXECUTE);
 
     // Take StepperMotor objects from Robot and keep them here
     this->steppers[0] = this->kernel->robot->alpha_stepper_motor;
@@ -52,7 +52,7 @@ void Endstops::on_config_reload(void* argument){
 }
 
 // Start homing sequences by response to GCode commands
-void Endstops::on_gcode_received(void* argument){
+void Endstops::on_gcode_execute(void* argument){
     Gcode* gcode = static_cast<Gcode*>(argument);
     if( gcode->has_g){
         if( gcode->g == 28 ){
