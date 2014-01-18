@@ -74,19 +74,8 @@ void Robot::on_gcode_received(void * argument){
     Gcode* gcode = static_cast<Gcode*>(argument);
     gcode->call_on_gcode_execute_event_immediatly = false;
     gcode->on_gcode_execute_event_called = false;
-    //If the queue is empty, execute immediatly, otherwise attach to the last added block
-    if( this->kernel->player->queue.size() == 0 ){
-        gcode->call_on_gcode_execute_event_immediatly = true;
-        this->execute_gcode(gcode);
-        if( gcode->on_gcode_execute_event_called == false ){
             //printf("GCODE A: %s \r\n", gcode->command.c_str() );
-            this->kernel->call_event(ON_GCODE_EXECUTE, gcode );
-        }
-    }else{
-        Block* block = this->kernel->player->queue.get_ref( this->kernel->player->queue.size() - 1 );
-        this->execute_gcode(gcode);
-        block->append_gcode(gcode);
-    }
+    this->execute_gcode(gcode);
     
 }
 
@@ -135,7 +124,18 @@ void Robot::execute_gcode(Gcode* gcode){
                                                  this->current_position[2]);
                    return;
        }
-   }else{ return; }
+   }else{ 
+       double deltas[3];
+       for(int axis=X_AXIS;axis<=Z_AXIS;axis++){
+           deltas[axis]=0;
+	   }
+
+       // mark this gcode to be executed	    
+       gcode->call_on_gcode_execute_event_immediatly = true;    // mark executeable gcode for append
+       // add a block without move_information to insure execute the gcode in order
+       this->kernel->planner->append_block(gcode, false, 0, 0, 0, 0, deltas ); 
+       return; 
+   }
     
    //Get parameters
     double target[3], offset[3];
@@ -156,6 +156,12 @@ void Robot::execute_gcode(Gcode* gcode){
                 case MOTION_MODE_SEEK  : this->append_line(gcode, target, this->seek_rate ); break;
                 case MOTION_MODE_LINEAR: this->append_line(gcode, target, this->feed_rate ); break;
                 case MOTION_MODE_CW_ARC: case MOTION_MODE_CCW_ARC: this->compute_arc(gcode, offset, target ); break;
+                default :
+                    if( gcode->on_gcode_execute_event_called == false ){
+                        gcode->call_on_gcode_execute_event_immediatly = true;    // mark executeable gcode for append
+				        this->append_milestone(gcode, this->current_position, 0.0);
+                    }
+                break;
             }
             break;
     }
@@ -164,11 +170,10 @@ void Robot::execute_gcode(Gcode* gcode){
     // motion control system might still be processing the action and the real tool position
     // in any intermediate location.
     memcpy(this->current_position, target, sizeof(double)*3); // this->position[] = target[];
-
 }
 
 // Convert target from millimeters to steps, and append this to the planner
-void Robot::append_milestone( double target[], double rate ){
+void Robot::append_milestone(Gcode* gcode, double target[], double rate ){
     int steps[3]; //Holds the result of the conversion
    
     this->arm_solution->millimeters_to_steps( target, steps );
@@ -198,13 +203,13 @@ void Robot::append_milestone( double target[], double rate ){
         }
     }
 
-    this->kernel->planner->append_block( steps, rate*60, acceleration_value, millimeters_of_travel, deltas ); 
+    this->kernel->planner->append_block(gcode, true, steps, rate*60, acceleration_value, millimeters_of_travel, deltas ); 
+
 
     memcpy(this->last_milestone, target, sizeof(double)*3); // this->last_milestone[] = target[];
 }
 
 void Robot::append_line(Gcode* gcode, double target[], double rate ){
-
 
     // We cut the line into smaller segments. This is not usefull in a cartesian robot, but necessary for robots with rotational axes.
     // In cartesian robot, a high "mm_per_line_segment" setting will prevent waste.
@@ -215,9 +220,10 @@ void Robot::append_line(Gcode* gcode, double target[], double rate ){
             this->kernel->call_event(ON_GCODE_EXECUTE, gcode );
             gcode->on_gcode_execute_event_called = true;
     }
+    gcode->call_on_gcode_execute_event_immediatly = true;    // mark executeable gcode for append
 
     if (gcode->millimeters_of_travel == 0.0) {
-        this->append_milestone(this->current_position, 0.0);
+        this->append_milestone(gcode, this->current_position, 0.0);
         return;
     }
 
@@ -230,9 +236,9 @@ void Robot::append_line(Gcode* gcode, double target[], double rate ){
     //For each segment
     for( int i=0; i<segments-1; i++ ){
         for(int axis=X_AXIS; axis <= Z_AXIS; axis++ ){ temp_target[axis] += ( target[axis]-this->current_position[axis] )/segments; }
-        this->append_milestone(temp_target, rate);
+        this->append_milestone(gcode, temp_target, rate); 
     }
-    this->append_milestone(target, rate);
+    this->append_milestone(gcode, target, rate);
 }
 
 
@@ -258,9 +264,10 @@ void Robot::append_arc(Gcode* gcode, double target[], double offset[], double ra
             this->kernel->call_event(ON_GCODE_EXECUTE, gcode );
             gcode->on_gcode_execute_event_called = true;
     }
+    gcode->call_on_gcode_execute_event_immediatly = true;    // mark executeable gcode for append
 
     if (gcode->millimeters_of_travel == 0.0) {
-        this->append_milestone(this->current_position, 0.0);
+        this->append_milestone(gcode, this->current_position, 0.0);
         return;
     }
  
@@ -328,11 +335,11 @@ void Robot::append_arc(Gcode* gcode, double target[], double offset[], double ra
         arc_target[this->plane_axis_0] = center_axis0 + r_axis0;
         arc_target[this->plane_axis_1] = center_axis1 + r_axis1;
         arc_target[this->plane_axis_2] += linear_per_segment;
-        this->append_milestone(arc_target, this->feed_rate);
+        this->append_milestone(gcode, arc_target, this->feed_rate);
 
     }
     // Ensure last segment arrives at target location.
-    this->append_milestone(target, this->feed_rate);
+    this->append_milestone(gcode, target, this->feed_rate);
 }
 
 

@@ -17,15 +17,15 @@ class Player : public Module {
     public:
         Player();
 
-        Block* new_block();
-        void new_block_added();
-        void pop_and_process_new_block(int debug);
+        void on_module_loaded();
+        void on_idle(void* argument);
+        void finish();
         void wait_for_queue(int free_blocks);
+        Block* new_block();
 
         RingBuffer<Block,32> queue;  // Queue of Blocks
         Block* current_block;
-        bool looking_for_new_block;
-
+        bool running;
 };
 
 

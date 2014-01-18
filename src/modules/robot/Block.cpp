@@ -25,7 +25,9 @@ Block::Block(){
     this->final_rate = -1;
     this->steps_finished = 0;
     this->steps_per_minute = 0.0;
-    this->index = -1;
+    this->gcode_valid = false;
+    this->moving_block = false;
+    this->gcode.on_gcode_execute_event_called = true;
 }
 
 void Block::debug(Kernel* kernel){
@@ -133,7 +135,7 @@ inline double max_allowable_speed(double acceleration, double target_velocity, d
 
 
 // Called by Planner::recalculate() when scanning the plan from last to first entry.
-void Block::reverse_pass(Block* next, Block* previous){
+void Block::reverse_pass(Block* next){
 
     if (next) {
         // If entry speed is already at the maximum entry speed, no need to recheck. Block is cruising.
@@ -157,7 +159,7 @@ void Block::reverse_pass(Block* next, Block* previous){
 
 
 // Called by Planner::recalculate() when scanning the plan from first to last entry.
-void Block::forward_pass(Block* previous, Block* next){
+void Block::forward_pass(Block* previous){
 
     if(!previous) { return; } // Begin planning after buffer_tail
 
@@ -196,25 +198,12 @@ void Block::forward_pass(Block* previous, Block* next){
 
 // Gcodes are attached to their respective blocks so that on_gcode_execute can be called with it
 void Block::append_gcode(Gcode* gcode){
-   __disable_irq();
-// this leads to Hard Fault - guess its not released with the block
-//   this->gcodes.push_back(*gcode);
-   __enable_irq();
-}
-
-// The attached gcodes are then poped and the on_gcode_execute event is called with them as a parameter
-void Block::pop_and_execute_gcode(Kernel* &kernel){
-    Block* block = const_cast<Block*>(this);
-    for(unsigned short index=0; index<block->gcodes.size(); index++){
-        //printf("GCODE Z: %s \r\n", block->gcodes[index].command.c_str() );
-        kernel->call_event(ON_GCODE_EXECUTE, &(block->gcodes[index]));
-    }
+	this->gcode=*gcode;
 }
 
 // Signal the player that this block is ready to be injected into the system
 void Block::ready(){
     this->is_ready = true;
-    this->player->new_block_added();
 }
 
 // Mark the block as taken by one more module
@@ -229,33 +218,7 @@ void Block::release(){
     this->times_taken--;
     //printf("releasing %p times now:%d\r\n", this, int(this->times_taken) );
     if( this->times_taken < 1 ){
-        this->player->kernel->call_event(ON_BLOCK_END, this);
-        this->pop_and_execute_gcode(this->player->kernel);
-        Player* player = this->player;
-
-        if( player->queue.size() > 0 ){
-            player->queue.delete_first();
-        }
-
-        if( player->looking_for_new_block == false ){
-            if( player->queue.size() > 0 ){
-                Block* candidate =  player->queue.get_ref(0);
-                if( candidate->is_ready ){
-                    player->current_block = candidate;
-                    player->kernel->call_event(ON_BLOCK_BEGIN, player->current_block);
-                    if( player->current_block->times_taken < 1 ){
-                        player->current_block->times_taken = 1;
-                        player->current_block->release();
-                    }
-                }else{
-                    player->current_block = NULL;
-                    player->kernel->call_event(ON_FINISH);
-                }
-            }else{
-                player->current_block = NULL;
-                player->kernel->call_event(ON_FINISH);
-            }
-        }
+    	this->player->finish();
     }
 }
 

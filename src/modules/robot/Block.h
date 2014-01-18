@@ -28,20 +28,15 @@ class Block {
         void calculate_trapezoid( double entry_factor, double exit_factor );
         double estimate_acceleration_distance( double initial_rate, double target_rate, double acceleration );
         double intersection_distance(double initial_rate, double final_rate, double acceleration, double distance);
-        void reverse_pass(Block* previous, Block* next);
-        void forward_pass(Block* previous, Block* next);
+        void reverse_pass(Block* next);
+        void forward_pass(Block* previous);
         void debug(Kernel* kernel);
         void append_gcode(Gcode* gcode);
-        void pop_and_execute_gcode(Kernel* &kernel);
         double get_duration_left(unsigned int already_taken_steps);
         void take();
         void release();
         void ready();
 
-        vector<std::string> commands;
-        vector<double> travel_distances;
-        vector<Gcode> gcodes;
-        
         unsigned int   steps[3];           // Number of steps for each axis for this block
         unsigned int   steps_event_count;  // Steps for the longest axis
         unsigned int   nominal_rate;       // Nominal rate in steps per minute
@@ -57,8 +52,9 @@ class Block {
         unsigned int   direction_bits;     // Direction for each axis in bit form, relative to the direction port's mask
         unsigned int   steps_finished;     // steps already finished - for recalculation of actual move
         double         steps_per_minute;   // actual rate - for recalculation
-        int            index;              // index in queue - for debug
-
+		bool           gcode_valid;        // signal valid gcode
+		bool           moving_block;       // signal valid move
+        Gcode          gcode;
 
         uint8_t recalculate_flag; // Planner flag to recalculate trapezoids on entry junction
         uint8_t nominal_length_flag; // Planner flag for nominal speed always reached

@@ -21,7 +21,7 @@ Planner::Planner(){
     clear_vector(this->position);
     clear_vector_double(this->previous_unit_vec);
     this->previous_nominal_speed = 0.0;
-    this->has_deleted_block = false;
+
 }
 
 void Planner::on_module_loaded(){
@@ -35,7 +35,7 @@ void Planner::on_config_reload(void* argument){
 
 
 // Append a block to the queue, compute it's speed factors
-void Planner::append_block( int target[], double feed_rate, double acceleration, double distance, double deltas[] ){
+void Planner::append_block(Gcode* gcode, bool moving, int target[], double feed_rate, double acceleration, double distance, double deltas[] ){
 
     //printf("new block\r\n");
 
@@ -43,116 +43,122 @@ void Planner::append_block( int target[], double feed_rate, double acceleration,
     this->kernel->player->wait_for_queue(2);
 
     Block* block = this->kernel->player->new_block();
+
+   	block->append_gcode(gcode);
+   	block->gcode_valid = gcode->call_on_gcode_execute_event_immediatly;    // mark executed gcode
+    gcode->call_on_gcode_execute_event_immediatly = false;    // mark executed gcode
+    block->moving_block = moving;
     block->planner = this;
 
     // Direction bits
     block->direction_bits = 0;
     block->acceleration = acceleration;
-    for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){
-        if( target[stepper] < position[stepper] ){ block->direction_bits |= (1<<stepper); }
-    }
-    
-    // Number of steps for each stepper
-    for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){ block->steps[stepper] = labs(target[stepper] - this->position[stepper]); }
-    
-    // Max number of steps, for all axes
-    block->steps_event_count = max( block->steps[ALPHA_STEPPER], max( block->steps[BETA_STEPPER], block->steps[GAMMA_STEPPER] ) );
-    //if( block->steps_event_count == 0 ){ this->computing = false; return; }
-
     block->millimeters = distance;
-    double inverse_millimeters = 0;
-    if( distance > 0 ){ inverse_millimeters = 1.0/distance; }
 
-    // Calculate speed in mm/minute for each axis. No divide by zero due to previous checks.
-    // NOTE: Minimum stepper speed is limited by MINIMUM_STEPS_PER_MINUTE in stepper.c
-    double inverse_minute = feed_rate * inverse_millimeters;
-    if( distance > 0 ){
-        block->nominal_speed = block->millimeters * inverse_minute;           // (mm/min) Always > 0
-        block->nominal_rate = ceil(block->steps_event_count * inverse_minute); // (step/min) Always > 0
-    }else{
-        block->nominal_speed = 0;
-        block->nominal_rate = 0;
-    }
-
-    //this->kernel->streams->printf("nom_speed: %f nom_rate: %u step_event_count: %u block->steps_z: %u \r\n", block->nominal_speed, block->nominal_rate, block->steps_event_count, block->steps[2]  );
-    
-    // Compute the acceleration rate for the trapezoid generator. Depending on the slope of the line
-    // average travel per step event changes. For a line along one axis the travel per step event
-    // is equal to the travel/step in the particular axis. For a 45 degree line the steppers of both
-    // axes might step for every step event. Travel per step event is then sqrt(travel_x^2+travel_y^2).
-    // To generate trapezoids with contant acceleration between blocks the rate_delta must be computed
-    // specifically for each line to compensate for this phenomenon:
-    // Convert universal acceleration for direction-dependent stepper rate change parameter
-    block->rate_delta = (float)( ( block->steps_event_count*inverse_millimeters * acceleration ) / ( this->kernel->stepper->acceleration_ticks_per_second * 60 ) ); // (step/min/acceleration_tick)
-
-
-    // Compute path unit vector
-    double unit_vec[3];
-    unit_vec[X_AXIS] = deltas[X_AXIS]*inverse_millimeters;
-    unit_vec[Y_AXIS] = deltas[Y_AXIS]*inverse_millimeters;
-    unit_vec[Z_AXIS] = deltas[Z_AXIS]*inverse_millimeters;
-  
-    // Compute maximum allowable entry speed at junction by centripetal acceleration approximation.
-    // Let a circle be tangent to both previous and current path line segments, where the junction
-    // deviation is defined as the distance from the junction to the closest edge of the circle,
-    // colinear with the circle center. The circular segment joining the two paths represents the
-    // path of centripetal acceleration. Solve for max velocity based on max acceleration about the
-    // radius of the circle, defined indirectly by junction deviation. This may be also viewed as
-    // path width or max_jerk in the previous grbl version. This approach does not actually deviate
-    // from path, but used as a robust way to compute cornering speeds, as it takes into account the
-    // nonlinearities of both the junction angle and junction velocity.
-    double vmax_junction = MINIMUM_PLANNER_SPEED; // Set default max junction speed
-
-    if (this->kernel->player->queue.size() > 1 && (this->previous_nominal_speed > 0.0)) {
-      // Compute cosine of angle between previous and current path. (prev_unit_vec is negative)
-      // NOTE: Max junction velocity is computed without sin() or acos() by trig half angle identity.
-      double cos_theta = - this->previous_unit_vec[X_AXIS] * unit_vec[X_AXIS]
-                         - this->previous_unit_vec[Y_AXIS] * unit_vec[Y_AXIS]
-                         - this->previous_unit_vec[Z_AXIS] * unit_vec[Z_AXIS] ;
-                           
-      // Skip and use default max junction speed for 0 degree acute junction.
-      if (cos_theta < 0.95) {
-        vmax_junction = min(this->previous_nominal_speed,block->nominal_speed);
-        // Skip and avoid divide by zero for straight junctions at 180 degrees. Limit to min() of nominal speeds.
-        if (cos_theta > -0.95) {
-          // Compute maximum junction velocity based on maximum acceleration and junction deviation
-          double sin_theta_d2 = sqrt(0.5*(1.0-cos_theta)); // Trig half angle identity. Always positive.
-          vmax_junction = min(vmax_junction,
-            sqrt(acceleration * this->junction_deviation * sin_theta_d2/(1.0-sin_theta_d2)) ); 
+    if (moving) {
+        for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){
+            if( target[stepper] < position[stepper] ){ block->direction_bits |= (1<<stepper); }
         }
-      }
-    }
-    block->max_entry_speed = vmax_junction;
-   
-    // Initialize block entry speed. Compute based on deceleration to user-defined MINIMUM_PLANNER_SPEED.
-    double v_allowable = this->max_allowable_speed(-acceleration,0.0,block->millimeters); //TODO: Get from config
-    block->entry_speed = min(vmax_junction, v_allowable);
-
-    // Initialize planner efficiency flags
-    // Set flag if block will always reach maximum junction speed regardless of entry/exit speeds.
-    // If a block can de/ac-celerate from nominal speed to zero within the length of the block, then
-    // the current block and next block junction speeds are guaranteed to always be at their maximum
-    // junction speeds in deceleration and acceleration, respectively. This is due to how the current
-    // block nominal speed limits both the current and next maximum junction speeds. Hence, in both
-    // the reverse and forward planners, the corresponding block junction speed will always be at the
-    // the maximum junction speed and may always be ignored for any speed reduction checks.
-    if (block->nominal_speed <= v_allowable) { block->nominal_length_flag = true; }
-    else { block->nominal_length_flag = false; }
-    block->recalculate_flag = true; // Always calculate trapezoid for new block
- 
-    // Update previous path unit_vector and nominal speed
-    memcpy(this->previous_unit_vec, unit_vec, sizeof(unit_vec)); // previous_unit_vec[] = unit_vec[]
-    this->previous_nominal_speed = block->nominal_speed;
     
-    // Update current position
-    memcpy(this->position, target, sizeof(int)*3);
+        // Number of steps for each stepper
+        for( int stepper=ALPHA_STEPPER; stepper<=GAMMA_STEPPER; stepper++){ block->steps[stepper] = labs(target[stepper] - this->position[stepper]); }
+    
+        // Max number of steps, for all axes
+        block->steps_event_count = max( block->steps[ALPHA_STEPPER], max( block->steps[BETA_STEPPER], block->steps[GAMMA_STEPPER] ) );
+        //if( block->steps_event_count == 0 ){ this->computing = false; return; }
 
-    // Math-heavy re-computing of the whole queue to take the new
-    this->recalculate();
+        double inverse_millimeters = 0;
+        if( distance > 0 ){ inverse_millimeters = 1.0/distance; }
+
+        // Calculate speed in mm/minute for each axis. No divide by zero due to previous checks.
+        // NOTE: Minimum stepper speed is limited by MINIMUM_STEPS_PER_MINUTE in stepper.c
+        double inverse_minute = feed_rate * inverse_millimeters;
+        if( distance > 0 ){
+            block->nominal_speed = block->millimeters * inverse_minute;           // (mm/min) Always > 0
+            block->nominal_rate = ceil(block->steps_event_count * inverse_minute); // (step/min) Always > 0
+        }else{
+            block->nominal_speed = 0;
+            block->nominal_rate = 0;
+        }
+
+        //this->kernel->streams->printf("nom_speed: %f nom_rate: %u step_event_count: %u block->steps_z: %u \r\n", block->nominal_speed, block->nominal_rate, block->steps_event_count, block->steps[2]  );
+    
+        // Compute the acceleration rate for the trapezoid generator. Depending on the slope of the line
+        // average travel per step event changes. For a line along one axis the travel per step event
+        // is equal to the travel/step in the particular axis. For a 45 degree line the steppers of both
+        // axes might step for every step event. Travel per step event is then sqrt(travel_x^2+travel_y^2).
+        // To generate trapezoids with contant acceleration between blocks the rate_delta must be computed
+        // specifically for each line to compensate for this phenomenon:
+        // Convert universal acceleration for direction-dependent stepper rate change parameter
+        block->rate_delta = (float)( ( block->steps_event_count*inverse_millimeters * acceleration ) / ( this->kernel->stepper->acceleration_ticks_per_second * 60 ) ); // (step/min/acceleration_tick)
+
+        // Compute path unit vector
+        double unit_vec[3];
+        unit_vec[X_AXIS] = deltas[X_AXIS]*inverse_millimeters;
+        unit_vec[Y_AXIS] = deltas[Y_AXIS]*inverse_millimeters;
+        unit_vec[Z_AXIS] = deltas[Z_AXIS]*inverse_millimeters;
+  
+        // Compute maximum allowable entry speed at junction by centripetal acceleration approximation.
+        // Let a circle be tangent to both previous and current path line segments, where the junction
+        // deviation is defined as the distance from the junction to the closest edge of the circle,
+        // colinear with the circle center. The circular segment joining the two paths represents the
+        // path of centripetal acceleration. Solve for max velocity based on max acceleration about the
+        // radius of the circle, defined indirectly by junction deviation. This may be also viewed as
+        // path width or max_jerk in the previous grbl version. This approach does not actually deviate
+        // from path, but used as a robust way to compute cornering speeds, as it takes into account the
+        // nonlinearities of both the junction angle and junction velocity.
+        double vmax_junction = MINIMUM_PLANNER_SPEED; // Set default max junction speed
+
+        if (this->kernel->player->queue.size() > 1 && (this->previous_nominal_speed > 0.0)) {
+          // Compute cosine of angle between previous and current path. (prev_unit_vec is negative)
+          // NOTE: Max junction velocity is computed without sin() or acos() by trig half angle identity.
+          double cos_theta = - this->previous_unit_vec[X_AXIS] * unit_vec[X_AXIS]
+                             - this->previous_unit_vec[Y_AXIS] * unit_vec[Y_AXIS]
+                             - this->previous_unit_vec[Z_AXIS] * unit_vec[Z_AXIS] ;
+                           
+          // Skip and use default max junction speed for 0 degree acute junction.
+          if (cos_theta < 0.95) {
+            vmax_junction = min(this->previous_nominal_speed,block->nominal_speed);
+            // Skip and avoid divide by zero for straight junctions at 180 degrees. Limit to min() of nominal speeds.
+            if (cos_theta > -0.95) {
+              // Compute maximum junction velocity based on maximum acceleration and junction deviation
+              double sin_theta_d2 = sqrt(0.5*(1.0-cos_theta)); // Trig half angle identity. Always positive.
+              vmax_junction = min(vmax_junction,
+                sqrt(acceleration * this->junction_deviation * sin_theta_d2/(1.0-sin_theta_d2)) ); 
+            }
+          }
+        }
+        block->max_entry_speed = vmax_junction;
+   
+        // Initialize block entry speed. Compute based on deceleration to user-defined MINIMUM_PLANNER_SPEED.
+        double v_allowable = this->max_allowable_speed(-acceleration,0.0,block->millimeters); //TODO: Get from config
+        block->entry_speed = min(vmax_junction, v_allowable);
+
+        // Initialize planner efficiency flags
+        // Set flag if block will always reach maximum junction speed regardless of entry/exit speeds.
+        // If a block can de/ac-celerate from nominal speed to zero within the length of the block, then
+        // the current block and next block junction speeds are guaranteed to always be at their maximum
+        // junction speeds in deceleration and acceleration, respectively. This is due to how the current
+        // block nominal speed limits both the current and next maximum junction speeds. Hence, in both
+        // the reverse and forward planners, the corresponding block junction speed will always be at the
+        // the maximum junction speed and may always be ignored for any speed reduction checks.
+        if (block->nominal_speed <= v_allowable) { block->nominal_length_flag = true; }
+        else { block->nominal_length_flag = false; }
+        block->recalculate_flag = true; // Always calculate trapezoid for new block
+ 
+        // Update previous path unit_vector and nominal speed
+        memcpy(this->previous_unit_vec, unit_vec, sizeof(unit_vec)); // previous_unit_vec[] = unit_vec[]
+        this->previous_nominal_speed = block->nominal_speed;
+    
+        // Update current position
+        memcpy(this->position, target, sizeof(int)*3);
+
+        // Math-heavy re-computing of the whole queue to take the new
+        this->recalculate();
+    }
     
     // The block can now be used
     block->ready();
-
 }
 
 
@@ -186,17 +192,19 @@ void Planner::reverse_pass(){
     // For each block
     int block_index_end = this->kernel->player->queue.head;
     int block_index = this->kernel->player->queue.tail;
-    Block* blocks[3] = {NULL,NULL,NULL};
+    Block* blocks[2] = {NULL,NULL};
+    Block* tempblock;
 
     while(block_index!=block_index_end){
         block_index = this->kernel->player->queue.prev_block_index( block_index );
-        blocks[2] = blocks[1];
+        tempblock = &this->kernel->player->queue.buffer[block_index];
+        if (tempblock->moving_block) {
         blocks[1] = blocks[0];
-        blocks[0] = &this->kernel->player->queue.buffer[block_index];
-        if( blocks[1] == NULL ){ continue; }
-        blocks[1]->reverse_pass(blocks[2], blocks[0]);
+        	blocks[0] = tempblock;
+            if( blocks[0] == NULL ){ continue; }
+            blocks[0]->reverse_pass(blocks[1]);
+        }
     }
-    
 }
 
 // Planner::recalculate() needs to go over the current plan twice. Once in reverse and once forward. This
@@ -204,18 +212,21 @@ void Planner::reverse_pass(){
 void Planner::forward_pass() {
     // For each block
     int block_index = this->kernel->player->queue.head;
-    Block* blocks[3] = {NULL,NULL,NULL};
+    Block* blocks[2] = {NULL,NULL};
+    Block* tempblock;
 
     while(block_index!=this->kernel->player->queue.tail){
+        tempblock = &this->kernel->player->queue.buffer[block_index];
+        if (tempblock->moving_block) {
         blocks[0] = blocks[1];
-        blocks[1] = blocks[2];
-        blocks[2] = &this->kernel->player->queue.buffer[block_index];
-        if( blocks[0] == NULL ){ continue; }
-        blocks[1]->forward_pass(blocks[0],blocks[2]);
+    	   	blocks[1] = tempblock;
+            if( blocks[1] == NULL ){ continue; }
+       	    blocks[1]->forward_pass(blocks[0]);
+       	}
         block_index = this->kernel->player->queue.next_block_index( block_index );
     }
-    blocks[2]->forward_pass(blocks[1],NULL);
-
+    if( blocks[1] != NULL )
+        blocks[1]->forward_pass(blocks[0]);
 }
 
 // Recalculates the trapezoid speed profiles for flagged blocks in the plan according to the
@@ -225,16 +236,20 @@ void Planner::forward_pass() {
 // to exit speed and entry speed of one another.
 void Planner::recalculate_trapezoids() {
     int block_index = this->kernel->player->queue.head;
-    Block* current;
+    Block* tempblock;
+//    Block* current;
     Block* next = NULL;
     // Last/newest block in buffer. Exit speed is set with MINIMUM_PLANNER_SPEED. Always recalculated.
     while(block_index != this->kernel->player->queue.tail){
-        next = &this->kernel->player->queue.buffer[block_index];
+        tempblock = &this->kernel->player->queue.buffer[block_index];
+    	if (tempblock->moving_block)
+            next = tempblock;
         block_index = this->kernel->player->queue.next_block_index( block_index );
     }
-    next->calculate_trapezoid( next->entry_speed/next->nominal_speed, MINIMUM_PLANNER_SPEED/next->nominal_speed); //TODO: Make configuration option
-    next->recalculate_flag = false;
-
+    if (next) {
+        next->calculate_trapezoid( next->entry_speed/next->nominal_speed, MINIMUM_PLANNER_SPEED/next->nominal_speed); //TODO: Make configuration option
+        next->recalculate_flag = false;
+    }
 }
 
 // Debug function

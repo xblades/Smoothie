@@ -20,7 +20,86 @@ using namespace std;
 
 Player::Player(){
     this->current_block = NULL;
-    this->looking_for_new_block = false;
+    this->running = false;
+}
+
+void Player::on_module_loaded(){
+    this->register_for_event(ON_IDLE); 
+}
+
+void Player::on_idle(void* argument){
+	if ((!this->running) && (this->queue.size() > 0)) {
+        if (this->queue.get_ref(0)->is_ready){
+        	this->running = true;
+            this->kernel->call_event(ON_START);
+            this->current_block = this->queue.get_ref(0);
+//printf("a\r\n");
+            if ( this->current_block->gcode_valid ) {
+	            if (! this->current_block->gcode.on_gcode_execute_event_called) {
+    	            this->current_block->gcode.on_gcode_execute_event_called = true;
+//printf("G1: %s \r\n", this->current_block->gcode.command.c_str() ); 
+                    this->kernel->call_event(ON_GCODE_EXECUTE, &(this->current_block->gcode));
+                }
+            }
+            this->kernel->call_event(ON_BLOCK_BEGIN, this->current_block);
+            // In case the module was not taken
+            if( this->current_block->times_taken < 1 ){
+                kernel->call_event(ON_BLOCK_END, this->current_block);
+                this ->running = false;
+                if( this->queue.size() > 0 ){ 
+                    this->queue.delete_first();
+                } 
+                this->kernel->call_event(ON_FINISH);
+            }
+        }
+    }
+}
+
+void Player::finish(){
+    this->kernel->call_event(ON_BLOCK_END, this);
+    this->current_block->is_ready = false;
+
+    if( this->queue.size() > 0 ){ 
+        this->queue.delete_first();
+    } 
+
+    if( this->queue.size() > 0 ){
+    	while( this->queue.size() > 0 ){
+            if( this->queue.get_ref(0)->is_ready ){
+                this->current_block = this->queue.get_ref(0);
+                if ( this->current_block->gcode_valid ) {
+                    if (! this->current_block->gcode.on_gcode_execute_event_called) {
+  	                    this->current_block->gcode.on_gcode_execute_event_called = true;
+                    }
+//printf("GCODE Z: %s \r\n", candidate->gcode.command.c_str() ); 
+                    this->kernel->call_event(ON_GCODE_EXECUTE, &(this->current_block->gcode));
+                }
+                this->kernel->call_event(ON_BLOCK_BEGIN, this->current_block);
+                if( this->current_block->times_taken < 1 ){
+                    this->kernel->call_event(ON_BLOCK_END, this->current_block);
+                    this->current_block->is_ready = false;
+                    if( this->queue.size() > 0 ){ 
+                        this->queue.delete_first();
+                    }
+                    if( this->queue.size() == 0 ){ 
+                        this->kernel->call_event(ON_FINISH);
+                        this->running = false;
+                        return;
+                    }
+                } else {
+                    return;
+                } 
+
+            }else{
+                this->kernel->call_event(ON_FINISH);
+                this->running = false;
+                return;
+            } 
+        } 
+    }else{
+        this->kernel->call_event(ON_FINISH);
+        this->running = false;
+    }
 }
 
 // Append a block to the list
@@ -32,15 +111,10 @@ Block* Player::new_block(){
     
     // Take the next untaken block on the queue ( the one after the last one )
     Block* block = this->queue.get_ref( this->queue.size() );
-    // Then clean it up
-    if( block->player == this ){
-        for(unsigned int index=0; index<block->gcodes.size(); index++){
-            block->gcodes.pop_back();
-        }
-    }
     
     // Create a new virgin Block in the queue
-    int index = this->queue.push_back(Block());
+    this->queue.push_back(Block());
+//printf("index %d\r\n",index);    
     block = this->queue.get_ref( this->queue.size()-1 );
     while( block == NULL ){
         block = this->queue.get_ref( this->queue.size()-1 );
@@ -50,48 +124,10 @@ Block* Player::new_block(){
     block->final_rate = -2;
     block->player = this;
     block->steps_per_minute = 0.0;
-    block->index = index;
-    
+    block->gcode_valid = false;
+    block->moving_block = false;
+//    block->index = index;
     return block;
-}
-
-// Used by blocks to signal when they are ready to be used by the system
-void Player::new_block_added(){
-    if( this->current_block == NULL ){
-    	this->kernel->call_event(ON_START);
-        this->pop_and_process_new_block(33);
-    }
-}
-
-// Process a new block in the queue
-void Player::pop_and_process_new_block(int debug){
-    if( this->looking_for_new_block ){ return; }
-    this->looking_for_new_block = true;
-
-    if( this->current_block != NULL ){ this->looking_for_new_block = false; return; }
-
-    // Return if queue is empty
-    if( this->queue.size() == 0 ){
-        this->current_block = NULL;
-        // TODO : ON_QUEUE_EMPTY event
-        this->looking_for_new_block = false;
-        return;
-    }
-    
-    // Get a new block
-    this->current_block = this->queue.get_ref(0);
-
-    // Tell all modules about it
-    this->kernel->call_event(ON_BLOCK_BEGIN, this->current_block);
-    
-    // In case the module was not taken
-    if( this->current_block->times_taken < 1 ){
-        this->looking_for_new_block = false;
-        this->current_block->release();
-    }
-
-    this->looking_for_new_block = false;
-
 }
 
 void Player::wait_for_queue(int free_blocks){
