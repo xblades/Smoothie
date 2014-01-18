@@ -21,6 +21,7 @@
 */
 
 Extruder::Extruder() {
+	this->running = false;
     this->absolute_mode = false;
     this->step_counter = 0;
     this->counter_increment = 0;
@@ -40,7 +41,6 @@ void Extruder::on_module_loaded() {
 
     // We work on the same Block as Stepper, so we need to know when it gets a new one and drops one
     this->register_for_event(ON_BLOCK_BEGIN);
-    this->register_for_event(ON_BLOCK_END);
     this->register_for_event(ON_GCODE_EXECUTE);
     this->register_for_event(ON_PLAY);
     this->register_for_event(ON_PAUSE);
@@ -90,35 +90,45 @@ void Extruder::on_play(void* argument){
 }
 
 
-
 // Compute extrusion speed based on parameters and gcode distance of travel
 void Extruder::on_gcode_execute(void* argument){
+
     Gcode* gcode = static_cast<Gcode*>(argument);
 
+//printf("ext: ##\r\n");
+//printf("e");
     // Absolute/relative mode
     if( gcode->has_m ){
         if( gcode->m == 82 ){ this->absolute_mode = true; }
         if( gcode->m == 83 ){ this->absolute_mode = false; }
         if( gcode->m == 84 ){ this->en_pin->set(1); }
     }
+//printf("f\r\n");
+}
 
-    // The mode is OFF by default, and SOLO or FOLLOW only if we need to extrude
+// When a new block begins, either follow the robot, or step by ourselves ( or stay back and do nothing )
+void Extruder::on_block_begin(void* argument){
+    Block* block = static_cast<Block*>(argument);
+    this->current_block = block;
+
+	Gcode* gcode = & block->gcode;
+
+    if (this->current_block->gcode_valid){
+//		this->gcode = block->get_gcode();
     this->mode = OFF;
-
-    if( gcode->has_g ){
-        // G92: Reset extruder position
-        if( gcode->g == 92 ){
-            if( gcode->has_letter('E') ){
-                this->current_position = gcode->get_value('E');
+        if (( gcode->has_g ) && ( gcode->g == 92 )) {
+//printf("ext_reset \r\n");
+            if( gcode->has_e ){
+   	            this->current_position = gcode->e;
                 this->target_position  = this->current_position;
                 this->current_steps = int(floor(this->steps_per_millimeter * this->current_position));
             }
-        }else{
-            // Extrusion length from 'G' Gcode
-            if( gcode->has_letter('E' )){
+        } else if( gcode->has_e ){
                 // Get relative extrusion distance depending on mode ( in absolute mode we must substract target_position )
-                double relative_extrusion_distance = gcode->get_value('E');
-                if( this->absolute_mode == true ){ relative_extrusion_distance = relative_extrusion_distance - this->target_position; }
+            double relative_extrusion_distance = gcode->e;
+            if( this->absolute_mode == true ){ relative_extrusion_distance = relative_extrusion_distance - this->current_position; }
+//            if( this->absolute_mode == true ){ relative_extrusion_distance = relative_extrusion_distance - this->target_position; }
+//printf("%1.2f %1.2f\n",relative_extrusion_distance,this->target_position);
 
                 // If the robot is moving, we follow it's movement, otherwise, we move alone
                 if( fabs(gcode->millimeters_of_travel) < 0.0001 ){  // With floating numbers, we can have 0 != 0 ... beeeh. For more info see : http://upload.wikimedia.org/wikipedia/commons/0/0a/Cain_Henri_Vidal_Tuileries.jpg
@@ -126,23 +136,15 @@ void Extruder::on_gcode_execute(void* argument){
                     this->stepper_motor->set_speed(current_rate); 
                     this->mode = SOLO;
                     this->travel_distance = relative_extrusion_distance;
-                    if( gcode->has_letter('F') ){ this->feed_rate = gcode->get_value('F'); }
+                if( gcode->has_f ){ this->feed_rate = gcode->f; }
                 }else{
                     // We move proportionally to the robot's movement
                     this->mode = FOLLOW;
                     this->travel_ratio = relative_extrusion_distance / gcode->millimeters_of_travel;
-                }
-
-                this->en_pin->set(0);
-            }
+//printf("%1.3f %1.3f %1.4f\n",gcode->e,gcode->millimeters_of_travel,this->travel_ratio);
         }
     }
 }
-
-// When a new block begins, either follow the robot, or step by ourselves ( or stay back and do nothing )
-void Extruder::on_block_begin(void* argument){
-    Block* block = static_cast<Block*>(argument);
-
 
     if( this->mode == SOLO ){
         // In solo mode we take the block so we can move even if the stepper has nothing to do
@@ -154,44 +156,43 @@ void Extruder::on_block_begin(void* argument){
         int old_steps = this->current_steps;
         int target_steps = int( floor(this->steps_per_millimeter*this->target_position) );
         int steps_to_step = abs( target_steps - old_steps );
+//printf("ext: %d  %d  %d  %f %f\r\n",this->current_steps,target_steps, steps_to_step, this->current_position, this->target_position);
         this->current_steps = target_steps;
 
         if( steps_to_step != 0 ){
 
             // We take the block, we have to release it or everything gets stuck
             block->take();
+            this->running = true;
             this->current_block = block;
 
             this->stepper_motor->move( ( this->travel_distance > 0 ), steps_to_step);
-
         }
-
-
     }else if( this->mode == FOLLOW ){
+//printf("bm%f  bes%f  bns%f  ir%d  nr%d  fr%d  sc%d  au%d  da%d\n",block->millimeters,block->entry_speed,
+//block->nominal_speed,block->initial_rate,block->nominal_rate,block->final_rate,block->steps_event_count,block->accelerate_until,block->decelerate_after);
         // In non-solo mode, we just follow the stepper module
-
-        this->current_block = block;
-        this->target_position =  this->current_position + ( this->current_block->millimeters * this->travel_ratio );
-
-        //int32_t steps_to_step = abs( int( floor(this->steps_per_millimeter*this->target_position) - floor(this->steps_per_millimeter*this->current_position) ) );
+        this->target_position =  this->current_position + ( this->current_block->distance * this->travel_ratio );
+//printf("%1.3f %1.3f %1.3f ",this->target_position,this->current_position,this->current_block->millimeters);
 
         int old_steps = this->current_steps;
         int target_steps = int( floor(this->steps_per_millimeter*this->target_position) );
         int steps_to_step = target_steps - old_steps ;
-        this->current_steps = target_steps;
 
+//printf("tp:%f cp:%f tr:%f mm:%f steps:%d stpm:%f cs:%d ts:%d\r\n", this->target_position, this->current_position, this->travel_ratio, this->current_block->distance, steps_to_step, this->steps_per_millimeter, this->current_steps,  target_steps);
+//printf("steps:%d cs:%d ts:%d\r\n", steps_to_step, this->current_steps,  target_steps);
+        this->current_steps = target_steps;
 
         if( steps_to_step != 0 ){
 
             //printf("taken for extruder: %u \r\n", steps_to_step);
 
             block->take();
+            this->running = true;
 
             //printf("spm:%f td:%f steps:%d ( %f - %f ) \r\n", this->steps_per_millimeter, this->travel_distance,  steps_to_step, this->target_position, this->current_position  );
 
             this->stepper_motor->move( ( steps_to_step > 0 ), abs(steps_to_step) );
-
-
 
         }
 
@@ -201,19 +202,14 @@ void Extruder::on_block_begin(void* argument){
         //this->stepper_motor->set_speed(0);
 
     }
-
 }
 
-// When a block ends, pause the stepping interrupt
-void Extruder::on_block_end(void* argument){
-    this->current_block = NULL;
-}
 
 // Called periodically to change the speed to match acceleration or to match the speed of the robot
 uint32_t Extruder::acceleration_tick(uint32_t dummy){
 
     // Avoid trying to work when we really shouldn't ( between blocks or re-entry )
-    if( this->current_block == NULL ||  this->paused || this->mode != SOLO ){ return 0; }
+    if( (!this->running) ||  this->paused || this->mode != SOLO ){ return 0; }
 
 //    uint32_t current_rate = this->stepper_motor->steps_per_second;
     uint32_t target_rate = int(floor((this->feed_rate/60)*this->steps_per_millimeter));
@@ -222,7 +218,7 @@ uint32_t Extruder::acceleration_tick(uint32_t dummy){
         uint32_t rate_increase = int(floor((this->acceleration/this->kernel->stepper->acceleration_ticks_per_second)*this->steps_per_millimeter));
         this->current_rate = min( target_rate, this->current_rate + rate_increase );
     }
-    if( current_rate > target_rate ){ current_rate = target_rate; }
+    if( this->current_rate > target_rate ){ current_rate = target_rate; }
 
 	this->current_rate = max(this->current_rate, this->kernel->stepper->minimum_steps_per_minute/60);
     this->stepper_motor->set_speed(this->current_rate); 
@@ -234,7 +230,7 @@ uint32_t Extruder::acceleration_tick(uint32_t dummy){
 void Extruder::on_speed_change( void* argument ){
 
     // Avoid trying to work when we really shouldn't ( between blocks or re-entry )
-    if( this->current_block == NULL ||  this->paused || this->mode != FOLLOW || this->stepper_motor->moving != true ){ return; }
+    if( (!this->running) ||  this->paused || this->mode != FOLLOW || this->stepper_motor->moving != true ){ return; }
 
     /*
     * nominal block duration = current block's steps / ( current block's nominal rate / 60 )
@@ -246,7 +242,6 @@ void Extruder::on_speed_change( void* argument ){
     */
 
     this->stepper_motor->set_speed( max( ( this->kernel->stepper->trapezoid_adjusted_rate /60L) * ( (double)this->stepper_motor->steps_to_move / (double)this->current_block->steps_event_count ), this->kernel->stepper->minimum_steps_per_minute/60 ) );
-
 }
 
 
@@ -255,11 +250,12 @@ void Extruder::on_speed_change( void* argument ){
 uint32_t Extruder::stepper_motor_finished_move(uint32_t dummy){
 
     //printf("extruder releasing\r\n");
-
-    this->current_position = this->target_position;
-
-    this->current_block->release();
+    this->current_position = this->current_steps/this->steps_per_millimeter;
+//  this->current_position = this->gcode->e;
+    if (this->running) {
+        this->running = false;
+        this->current_block->release();
+    }
     return 0;
-
 }
 

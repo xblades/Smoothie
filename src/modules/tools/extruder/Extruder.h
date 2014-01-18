@@ -14,7 +14,6 @@
 #include "libs/Kernel.h"
 #include "modules/robot/Block.h"
 
-#define microseconds_per_step_pulse_checksum 42333
 #define extruder_module_enable_checksum      6183
 #define extruder_steps_per_mm_checksum       58088
 #define extruder_acceleration_checksum       60356
@@ -31,7 +30,6 @@ class Extruder : public Module{
         void on_config_reload(void* argument);
         void on_gcode_execute(void* argument);
         void on_block_begin(void* argument);
-        void on_block_end(void* argument);
         void on_play(void* argument);
         void on_pause(void* argument);
         void on_speed_change(void* argument);
@@ -46,11 +44,11 @@ class Extruder : public Module{
         double          current_position;             // Current point ( in steps ) for the current move, incremented every time a step is outputed
         int             current_steps;
         Block*          current_block;                // Current block we are stepping, same as Stepper's one
-        int             microseconds_per_step_pulse;  // Pulse duration for step pulses
         double          steps_per_millimeter;         // Steps to travel one millimeter
         double          feed_rate;                    //
         double          acceleration;                 //
-        unsigned int    current_rate;
+        uint32_t        current_rate;
+//		Gcode* 			gcode;
 
         int             counter_increment;
         int             step_counter;
@@ -59,6 +57,7 @@ class Extruder : public Module{
         double          travel_ratio;
         double          travel_distance;
         bool            absolute_mode;
+        bool            running;
 
         bool            debug;
         int debug_count;
